@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
@@ -29,10 +30,8 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
     });
     
     try {
-      List<AppInfo> apps = (await InstalledApps.getInstalledApps(false, true))
-          .where((app) => app.packageName?.isNotEmpty ?? false)
-          .toList();
-
+      var apps = await compute(_loadAppsInBackground, null);
+      
       if (apps.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -47,10 +46,10 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       apps = apps.where((app) {
         final package = app.packageName;
         if (package == null) return false;
-        return !package.startsWith('com.android.') &&
-               !package.startsWith('com.google.') &&
-               !package.contains('.provider') &&
-               !package.contains('.core');
+        return package.startsWith('com.android.') &&
+               package.startsWith('com.google.') &&
+               package.contains('.provider') &&
+               package.contains('.core');
       }).toList();
       
       if (apps.isEmpty) {
@@ -79,7 +78,6 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       setState(() {
         _apps = apps;
         _selectedApps = apps.where((app) => 
-          app.packageName != null && 
           savedPackages.contains(app.packageName)
         ).toList();
         _isLoading = false;
@@ -174,5 +172,28 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
               },
             ),
     );
+  }
+}
+
+// Añadir esta función al final del archivo
+Future<List<AppInfo>> _loadAppsInBackground(_) async {
+  try {
+    List<AppInfo> apps = (await InstalledApps.getInstalledApps(false, true))
+        .where((app) => app.packageName?.isNotEmpty ?? false)
+        .toList();
+
+    apps = apps.where((app) {
+      final package = app.packageName;
+      if (package == null) return false;
+      return !package.startsWith('com.android.') &&
+             !package.startsWith('com.google.') &&
+             !package.contains('.provider') &&
+             !package.contains('.core');
+    }).toList();
+
+    apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+    return apps;
+  } catch (e) {
+    return [];
   }
 }
