@@ -11,17 +11,16 @@ android {
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        //sourceCompatibility = JavaVersion.VERSION_11
-        //targetCompatibility = JavaVersion.VERSION_11
-        // Sets Java compatibility to Java 8
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        // Actualizar Java para que coincida con Kotlin
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
         
         // Habilitar desugaring usando la sintaxis correcta para Kotlin DSL
         isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
+        // Mantener Kotlin en JVM 11
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
@@ -30,7 +29,7 @@ android {
         applicationId = "com.example.conectados"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23  // Actualizado de 21 a 23 para compatibilidad con awesome_notifications
+        minSdk = 23  // Actualizado para compatibilidad con awesome_notifications
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -46,7 +45,6 @@ android {
 }
 
 dependencies {
-    // Actualizar a la versión 1.2.2 o superior como requiere flutter_local_notifications
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.2.2")
 }
 
