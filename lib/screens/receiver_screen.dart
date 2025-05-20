@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'notification_display_page.dart';
 import '../widgets/permission_item.dart';
+import '../services/error_service.dart'; // Importar el servicio de errores
 
 class ReceiverSetupPage extends StatefulWidget {
   const ReceiverSetupPage({super.key});
@@ -20,6 +21,9 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
   bool _isPairingCodeCardExpanded = false;
   bool _isConnectionStatusCardExpanded = false;
 
+  // Instancia del servicio de errores
+  final ErrorService _errorService = ErrorService();
+
   @override
   void initState() {
     super.initState();
@@ -33,55 +37,100 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
   }
 
   Future<void> _checkPermissions() async {
-    final bluetoothStatus = await Permission.bluetooth.status;
-    final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
-    final bluetoothScanStatus = await Permission.bluetoothScan.status;
+    try {
+      final bluetoothStatus = await Permission.bluetooth.status;
+      final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
+      final bluetoothScanStatus = await Permission.bluetoothScan.status;
 
-    setState(() {
-      _bluetoothPermissionGranted =
-          bluetoothStatus.isGranted &&
-          bluetoothConnectStatus.isGranted &&
-          bluetoothScanStatus.isGranted;
-    });
+      setState(() {
+        _bluetoothPermissionGranted =
+            bluetoothStatus.isGranted &&
+            bluetoothConnectStatus.isGranted &&
+            bluetoothScanStatus.isGranted;
+      });
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'receiver_screen.dart - _checkPermissions',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   Future<void> _requestPermissions() async {
-    await Permission.bluetooth.request();
-    await Permission.bluetoothConnect.request();
-    await Permission.bluetoothScan.request();
+    try {
+      await Permission.bluetooth.request();
+      await Permission.bluetoothConnect.request();
+      await Permission.bluetoothScan.request();
 
-    _checkPermissions();
+      _checkPermissions();
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'receiver_screen.dart - _requestPermissions',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   void _connectToEmitter() {
-    if (_codeController.text.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El código debe tener 6 dígitos')),
-      );
-      return;
-    }
-
-    // Implementar la lógica de conexión Bluetooth
-    final bluetoothService = BluetoothConnectionService();
-    bluetoothService.initialize().then((_) {
-      // Buscar dispositivos y conectar usando el código
-      bluetoothService.discoverDevices().then((devices) {
-        // Aquí deberíamos implementar la lógica para verificar el código
-        // y conectar con el dispositivo correcto
-
+    try {
+      if (_codeController.text.length != 6) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Conectando... Por favor espere')),
+          const SnackBar(content: Text('El código debe tener 6 dígitos')),
         );
+        return;
+      }
 
-        // Por ahora, simplemente navegamos a la siguiente pantalla
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const NotificationDisplayPage(),
-          ),
+      // Implementar la lógica de conexión Bluetooth
+      final bluetoothService = BluetoothConnectionService();
+      bluetoothService.initialize().then((_) {
+        // Buscar dispositivos y conectar usando el código
+        bluetoothService.discoverDevices().then((devices) {
+          // Aquí deberíamos implementar la lógica para verificar el código
+          // y conectar con el dispositivo correcto
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Conectando... Por favor espere')),
+          );
+
+          // Por ahora, simplemente navegamos a la siguiente pantalla
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const NotificationDisplayPage(),
+            ),
+          );
+        }).catchError((e, st) { // Capturar errores en la cadena de Future
+           _errorService.logError(
+            script: 'receiver_screen.dart - _connectToEmitter - discoverDevices',
+            error: e,
+            stackTrace: st,
+          );
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al buscar dispositivos: ${e.toString()}')),
+          );
+        });
+      }).catchError((e, st) { // Capturar errores en la cadena de Future
+         _errorService.logError(
+          script: 'receiver_screen.dart - _connectToEmitter - initialize',
+          error: e,
+          stackTrace: st,
+        );
+         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al inicializar Bluetooth: ${e.toString()}')),
         );
       });
-    });
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'receiver_screen.dart - _connectToEmitter',
+        error: e,
+        stackTrace: st,
+      );
+       ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error general al conectar: ${e.toString()}')),
+      );
+    }
   }
 
   // Widget reutilizable para crear cards con control de visibilidad
@@ -187,8 +236,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
+                      child: ElevatedButton(style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: _connectToEmitter,

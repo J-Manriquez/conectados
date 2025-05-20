@@ -51,7 +51,7 @@ class MainApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const WelcomePage(),
+      home: WelcomePage(),
     );
   }
 }

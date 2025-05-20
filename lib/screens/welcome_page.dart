@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'emitter_screen.dart';
 import 'receiver_screen.dart';
+import '../services/error_service.dart'; // Importar el servicio de errores
 
 class WelcomePage extends StatelessWidget {
-  const WelcomePage({super.key});
+  WelcomePage({super.key});
+
+  // Instancia del servicio de errores
+  final ErrorService _errorService = ErrorService();
 
   @override
   Widget build(BuildContext context) {
@@ -36,12 +40,20 @@ class WelcomePage extends StatelessWidget {
                   minimumSize: const Size(double.infinity, 60),
                 ),
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EmitterSetupPage(),
-                    ),
-                  );
+                  try {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EmitterSetupPage(),
+                      ),
+                    );
+                  } catch (e, st) {
+                    _errorService.logError(
+                      script: 'welcome_page.dart - Emitter Button',
+                      error: e,
+                      stackTrace: st,
+                    );
+                  }
                 },
                 child: const Text('Modo Emisor (Smartphone)'),
               ),
@@ -51,12 +63,20 @@ class WelcomePage extends StatelessWidget {
                   minimumSize: const Size(double.infinity, 60),
                 ),
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ReceiverSetupPage(),
-                    ),
-                  );
+                  try {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ReceiverSetupPage(),
+                      ),
+                    );
+                  } catch (e, st) {
+                    _errorService.logError(
+                      script: 'welcome_page.dart - Receiver Button',
+                      error: e,
+                      stackTrace: st,
+                    );
+                  }
                 },
                 child: const Text('Modo Receptor (Smartwatch)'),
               ),

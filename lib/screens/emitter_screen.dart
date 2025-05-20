@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:math';
 import 'app_selection_page.dart';
 import '../widgets/permission_item.dart';
+import '../services/error_service.dart'; // Importar el servicio de errores
 
 class EmitterSetupPage extends StatefulWidget {
   const EmitterSetupPage({super.key});
@@ -15,48 +16,75 @@ class _EmitterSetupPageState extends State<EmitterSetupPage> {
   bool _notificationPermissionGranted = false;
   bool _bluetoothPermissionGranted = false;
   String _pairingCode = '';
-  
+
+  // Instancia del servicio de errores
+  final ErrorService _errorService = ErrorService();
+
   @override
   void initState() {
     super.initState();
     _checkPermissions();
     _generatePairingCode();
   }
-  
+
   Future<void> _checkPermissions() async {
-    final notificationStatus = await Permission.notification.status;
-    final bluetoothStatus = await Permission.bluetooth.status;
-    final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
-    final bluetoothScanStatus = await Permission.bluetoothScan.status;
-    
-    setState(() {
-      _notificationPermissionGranted = notificationStatus.isGranted;
-      _bluetoothPermissionGranted = bluetoothStatus.isGranted && 
-                                   bluetoothConnectStatus.isGranted && 
-                                   bluetoothScanStatus.isGranted;
-    });
-  }
-  
-  Future<void> _requestPermissions() async {
-    await Permission.notification.request();
-    await Permission.bluetooth.request();
-    await Permission.bluetoothConnect.request();
-    await Permission.bluetoothScan.request();
-    
-    _checkPermissions();
-  }
-  
-  void _generatePairingCode() {
-    final random = Random();
-    String code = '';
-    for (int i = 0; i < 6; i++) {
-      code += random.nextInt(10).toString();
+    try {
+      final notificationStatus = await Permission.notification.status;
+      final bluetoothStatus = await Permission.bluetooth.status;
+      final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
+      final bluetoothScanStatus = await Permission.bluetoothScan.status;
+
+      setState(() {
+        _notificationPermissionGranted = notificationStatus.isGranted;
+        _bluetoothPermissionGranted = bluetoothStatus.isGranted &&
+                                     bluetoothConnectStatus.isGranted &&
+                                     bluetoothScanStatus.isGranted;
+      });
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'emitter_screen.dart - _checkPermissions',
+        error: e,
+        stackTrace: st,
+      );
     }
-    setState(() {
-      _pairingCode = code;
-    });
   }
-  
+
+  Future<void> _requestPermissions() async {
+    try {
+      await Permission.notification.request();
+      await Permission.bluetooth.request();
+      await Permission.bluetoothConnect.request();
+      await Permission.bluetoothScan.request();
+
+      _checkPermissions();
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'emitter_screen.dart - _requestPermissions',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
+
+  void _generatePairingCode() {
+    try {
+      final random = Random();
+      String code = '';
+      for (int i = 0; i < 6; i++) {
+        code += random.nextInt(10).toString();
+      }
+      setState(() {
+        _pairingCode = code;
+      });
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'emitter_screen.dart - _generatePairingCode',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,12 +201,20 @@ class _EmitterSetupPageState extends State<EmitterSetupPage> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AppSelectionPage(),
-                    ),
-                  );
+                  try {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AppSelectionPage(),
+                      ),
+                    );
+                  } catch (e, st) {
+                    _errorService.logError(
+                      script: 'emitter_screen.dart - App Selection Button',
+                      error: e,
+                      stackTrace: st,
+                    );
+                  }
                 },
                 child: const Text('Continuar a Selección de Apps'),
               ),

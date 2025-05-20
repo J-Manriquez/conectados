@@ -6,6 +6,7 @@ import 'package:installed_apps/installed_apps.dart';
 import '../models/app_info.dart' as MyAppInfo;
 import '../services/storage_service.dart';
 import 'dart:ui'; // Importar para RootIsolateToken
+import '../services/error_service.dart'; // Importar el servicio de errores
 
 class AppSelectionPage extends StatefulWidget {
   const AppSelectionPage({super.key});
@@ -19,6 +20,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
   List<AppInfo> _selectedApps = [];
   bool _isLoading = true;
   final StorageService _storageService = StorageService();
+  final ErrorService _errorService = ErrorService(); // Instancia del servicio de errores
 
   @override
   void initState() {
@@ -82,8 +84,13 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
         _isLoading = false;
         print('[_loadApps] Estado actualizado. Total apps: ${_apps.length}, Apps seleccionadas: ${_selectedApps.length}'); // Log de estado final
       });
-    } catch (e) {
+    } catch (e, st) { // Capturar error y stack trace
       print('[_loadApps] Error al cargar aplicaciones: $e'); // Log de error
+      _errorService.logError( // Registrar el error
+        script: 'app_selection_page.dart - _loadApps',
+        error: e,
+        stackTrace: st,
+      );
       setState(() {
         _isLoading = false;
       });
@@ -98,7 +105,8 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
   }
 
   void _toggleAppSelection(AppInfo app) {
-    setState(() {
+    try { // Añadir try-catch
+      setState(() {
       if (_selectedApps.contains(app)) {
         _selectedApps.remove(app);
         print('[_toggleAppSelection] Deseleccionada: ${app.name}'); // Log de deselección
@@ -108,10 +116,19 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       }
       print('[_toggleAppSelection] Apps seleccionadas: ${_selectedApps.length}'); // Log de total seleccionadas
     });
+  } catch (e, st) { // Capturar error y stack trace
+      print('[_toggleAppSelection] Error al seleccionar/deseleccionar app: $e'); // Log de error
+      _errorService.logError( // Registrar el error
+        script: 'app_selection_page.dart - _toggleAppSelection',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   void _saveSelection() async {
-    print('[_saveSelection] Guardando selección...'); // Log de inicio de guardado
+    try { // Añadir try-catch
+      print('[_saveSelection] Guardando selección...'); // Log de inicio de guardado
     // Guardar la selección de aplicaciones
     List<String> selectedPackages = _selectedApps
         .where((app) => app.packageName != null)
@@ -138,6 +155,21 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
 
     Navigator.pop(context, selectedPackages);
     print('[_saveSelection] Navegando de regreso.'); // Log de navegación
+    } catch (e, st) { // Capturar error y stack trace
+      print('[_saveSelection] Error al guardar selección: $e'); // Log de error
+      _errorService.logError( // Registrar el error
+        script: 'app_selection_page.dart - _saveSelection',
+        error: e,
+        stackTrace: st,
+      );
+      // Opcional: mostrar un mensaje al usuario
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar la selección: ${e.toString()}'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   @override
@@ -185,7 +217,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
 
 // Modificar la función para aceptar el token
 Future<List<AppInfo>> _loadAppsInBackground(RootIsolateToken token) async {
-  try {
+  try { // Añadir try-catch
     print('[_loadAppsInBackground] Inicializando BackgroundIsolateBinaryMessenger...'); // Log de inicialización
     BackgroundIsolateBinaryMessenger.ensureInitialized(token);
     print('[_loadAppsInBackground] BackgroundIsolateBinaryMessenger inicializado.'); // Log de inicialización completada
@@ -201,8 +233,11 @@ Future<List<AppInfo>> _loadAppsInBackground(RootIsolateToken token) async {
     // apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
     // print('[_loadAppsInBackground] Aplicaciones ordenadas.'); // Log de ordenamiento
     return apps;
-  } catch (e) {
+  } catch (e, st) { // Capturar error y stack trace
     print('[_loadAppsInBackground] Error en segundo plano: $e'); // Log de error
+    // No tenemos acceso directo al ErrorService aquí, pero podemos imprimir o manejar de otra forma si es necesario.
+    // Para este ejemplo, simplemente imprimimos y retornamos vacío.
+    // Si se necesitara registrar, se podría pasar una instancia del servicio o usar un mecanismo global.
     return [];
   }
 }

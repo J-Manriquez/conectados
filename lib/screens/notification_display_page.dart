@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/notification_item.dart';
 import '../services/bluetooth_service.dart';
+import '../services/error_service.dart'; // Importar el servicio de errores
 
 class NotificationDisplayPage extends StatefulWidget {
   const NotificationDisplayPage({super.key});
@@ -12,19 +13,36 @@ class NotificationDisplayPage extends StatefulWidget {
 class _NotificationDisplayPageState extends State<NotificationDisplayPage> {
   final List<NotificationItem> _notifications = [];
   final BluetoothConnectionService _bluetoothService = BluetoothConnectionService();
-  
+  final ErrorService _errorService = ErrorService(); // Instancia del servicio de errores
+
   @override
   void initState() {
     super.initState();
-    _listenForNotifications();
+    try { // Añadir try-catch
+      _listenForNotifications();
+    } catch (e, st) { // Capturar error y stack trace
+      _errorService.logError( // Registrar el error
+        script: 'notification_display_page.dart - initState',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
-  
+
   void _listenForNotifications() {
     _bluetoothService.receivedNotifications.listen((notification) {
-      setState(() {
-        // Añadir al principio para mostrar las más recientes primero
-        _notifications.insert(0, notification);
-      });
+      try { // Añadir try-catch dentro del listener
+        setState(() {
+          // Añadir al principio para mostrar las más recientes primero
+          _notifications.insert(0, notification);
+        });
+      } catch (e, st) { // Capturar error y stack trace
+        _errorService.logError( // Registrar el error
+          script: 'notification_display_page.dart - _listenForNotifications',
+          error: e,
+          stackTrace: st,
+        );
+      }
     });
   }
 
