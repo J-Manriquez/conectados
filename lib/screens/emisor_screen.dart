@@ -8,7 +8,7 @@ class EmisorScreen extends StatefulWidget {
 }
 
 class _EmisorScreenState extends State<EmisorScreen> {
-  final BluetoothService _bluetoothService = BluetoothService();
+  final BluetoothConnectionService _bluetoothService = BluetoothConnectionService();
   final NotificationService _notificationService = NotificationService();
   String _pairingCode = '';
   bool _isConnected = false;

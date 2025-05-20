@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'bluetooth_service.dart';
 import 'notification_service.dart';
@@ -80,7 +81,7 @@ class BackgroundService {
     final notificationService = NotificationService();
     await notificationService.initialize();
     
-    final bluetoothService = BluetoothService();
+    final bluetoothService = BluetoothConnectionService();
     
     // Escuchar notificaciones y enviarlas por Bluetooth
     notificationService.notificationStream.listen((notification) async {

@@ -58,7 +58,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
     }
     
     // Implementar la lógica de conexión Bluetooth
-    final bluetoothService = BluetoothService();
+    final bluetoothService = BluetoothConnectionService();
     bluetoothService.initialize().then((_) {
       // Buscar dispositivos y conectar usando el código
       bluetoothService.discoverDevices().then((devices) {

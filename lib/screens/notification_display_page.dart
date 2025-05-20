@@ -11,7 +11,7 @@ class NotificationDisplayPage extends StatefulWidget {
 
 class _NotificationDisplayPageState extends State<NotificationDisplayPage> {
   final List<NotificationItem> _notifications = [];
-  final BluetoothService _bluetoothService = BluetoothService();
+  final BluetoothConnectionService _bluetoothService = BluetoothConnectionService();
   
   @override
   void initState() {

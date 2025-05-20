@@ -8,7 +8,7 @@ class ReceptorScreen extends StatefulWidget {
 }
 
 class _ReceptorScreenState extends State<ReceptorScreen> {
-  final BluetoothService _bluetoothService = BluetoothService();
+  final BluetoothConnectionService _bluetoothService = BluetoothConnectionService();
   final TextEditingController _codeController = TextEditingController();
   bool _isConnected = false;
   List<NotificationItem> _notifications = [];

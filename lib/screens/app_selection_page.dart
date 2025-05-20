@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:device_apps/device_apps.dart';
+import 'package:installed_apps/app_info.dart';
+import 'package:installed_apps/installed_apps.dart';
+import '../models/app_info.dart' as MyAppInfo;
+import '../services/storage_service.dart';
 
 class AppSelectionPage extends StatefulWidget {
   const AppSelectionPage({super.key});
@@ -9,9 +12,10 @@ class AppSelectionPage extends StatefulWidget {
 }
 
 class _AppSelectionPageState extends State<AppSelectionPage> {
-  List<Application> _apps = [];
-  List<Application> _selectedApps = [];
+  List<AppInfo> _apps = [];
+  List<AppInfo> _selectedApps = [];
   bool _isLoading = true;
+  final StorageService _storageService = StorageService();
   
   @override
   void initState() {
@@ -24,22 +28,40 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       _isLoading = true;
     });
     
-    List<Application> apps = await DeviceApps.getInstalledApplications(
-      includeAppIcons: true,
-      includeSystemApps: false,
-      onlyAppsWithLaunchIntent: true,
-    );
-    
-    // Ordenar alfabéticamente
-    apps.sort((a, b) => a.appName.compareTo(b.appName));
-    
-    setState(() {
-      _apps = apps;
-      _isLoading = false;
-    });
+    try {
+      // Usar la API correcta de InstalledApps
+      List<AppInfo> apps = await InstalledApps.getInstalledApps();
+      
+      // Filtrar aplicaciones del sistema si es necesario
+      apps = apps.where((app) => 
+        app.packageName != null && 
+        !app.packageName!.startsWith('com.android') &&
+        !app.packageName!.startsWith('com.google.android')
+      ).toList();
+      
+      // Ordenar alfabéticamente
+      apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+      
+      // Cargar aplicaciones previamente seleccionadas
+      List<String> savedPackages = await _storageService.getSelectedAppPackages();
+      
+      setState(() {
+        _apps = apps;
+        _selectedApps = apps.where((app) => 
+          app.packageName != null && 
+          savedPackages.contains(app.packageName)
+        ).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error al cargar aplicaciones: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
   
-  void _toggleAppSelection(Application app) {
+  void _toggleAppSelection(AppInfo app) {
     setState(() {
       if (_selectedApps.contains(app)) {
         _selectedApps.remove(app);
@@ -49,11 +71,27 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
     });
   }
   
-  void _saveSelection() {
+  void _saveSelection() async {
     // Guardar la selección de aplicaciones
-    List<String> selectedPackages = _selectedApps.map((app) => app.packageName).toList();
+    List<String> selectedPackages = _selectedApps
+        .where((app) => app.packageName != null)
+        .map((app) => app.packageName!)
+        .toList();
     
-    // Aquí implementaríamos la lógica para guardar en preferencias
+    // Convertir a nuestro modelo de AppInfo para guardar
+    List<MyAppInfo.AppInfo> myAppInfoList = _selectedApps
+        .where((app) => app.packageName != null && app.name != null)
+        .map((app) => MyAppInfo.AppInfo(
+          name: app.name!,
+          packageName: app.packageName!,
+          isSelected: true,
+          color: Colors.blue, // Color predeterminado
+          iconData: Icons.android, // Icono predeterminado
+        ))
+        .toList();
+    
+    // Guardar en preferencias
+    await _storageService.saveSelectedApps(myAppInfoList);
     
     Navigator.pop(context, selectedPackages);
   }
@@ -75,15 +113,15 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
           : ListView.builder(
               itemCount: _apps.length,
               itemBuilder: (context, index) {
-                Application app = _apps[index];
+                AppInfo app = _apps[index];
                 bool isSelected = _selectedApps.contains(app);
                 
                 return ListTile(
-                  leading: app is ApplicationWithIcon
-                      ? Image.memory(app.icon, width: 40, height: 40)
+                  leading: app.icon != null
+                      ? Image.memory(app.icon!, width: 40, height: 40)
                       : const Icon(Icons.android),
-                  title: Text(app.appName),
-                  subtitle: Text(app.packageName),
+                  title: Text(app.name ?? 'Sin nombre'),
+                  subtitle: Text(app.packageName ?? ''),
                   trailing: Checkbox(
                     value: isSelected,
                     onChanged: (bool? value) {
