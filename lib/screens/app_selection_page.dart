@@ -63,11 +63,12 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       }
       
       // Filtrar aplicaciones del sistema si es necesario
-      apps = apps.where((app) => 
-        app.packageName != null && 
-        !app.packageName.startsWith('com.android') &&   // Quitar !
-        !app.packageName.startsWith('com.google.android') // Quitar !
-      ).toList();
+      apps = apps.where((app) {
+        final package = app.packageName;
+        if (package == null) return false;
+        return !package.startsWith('com.android') &&
+               !package.startsWith('com.google.android');
+      }).toList();
       
       // Ordenar alfabéticamente
       apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
@@ -77,9 +78,10 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       
       setState(() {
         _apps = apps;
-        _selectedApps = apps.where((app) => 
-          savedPackages.contains(app.packageName)
-        ).toList();
+        _selectedApps = apps.where((app) {
+          final package = app.packageName;
+          return package != null && savedPackages.contains(package);
+        }).toList();
         _isLoading = false;
       });
     } catch (e) {
