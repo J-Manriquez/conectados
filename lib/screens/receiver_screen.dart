@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'notification_display_page.dart';
 import '../widgets/permission_item.dart';
 import '../services/error_service.dart'; // Importar el servicio de errores
+import '../services/flow_log_service.dart'; // Importar el nuevo servicio de flujo
 
 class ReceiverSetupPage extends StatefulWidget {
   const ReceiverSetupPage({super.key});
@@ -23,21 +24,26 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
 
   // Instancia del servicio de errores
   final ErrorService _errorService = ErrorService();
+  // Instancia del nuevo servicio de flujo
+  final FlowLogService _flowLogService = FlowLogService();
 
   @override
   void initState() {
     super.initState();
+    _flowLogService.logFlow(script: 'receiver_screen.dart - initState', message: 'Inicializando pantalla del receptor.');
     _checkPermissions();
   }
 
   @override
   void dispose() {
+    _flowLogService.logFlow(script: 'receiver_screen.dart - dispose', message: 'Liberando recursos de la pantalla del receptor.');
     _codeController.dispose();
     super.dispose();
   }
 
   Future<void> _checkPermissions() async {
     try {
+      _flowLogService.logFlow(script: 'receiver_screen.dart - _checkPermissions', message: 'Verificando permisos Bluetooth.');
       final bluetoothStatus = await Permission.bluetooth.status;
       final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
       final bluetoothScanStatus = await Permission.bluetoothScan.status;
@@ -47,6 +53,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
             bluetoothStatus.isGranted &&
             bluetoothConnectStatus.isGranted &&
             bluetoothScanStatus.isGranted;
+        _flowLogService.logFlow(script: 'receiver_screen.dart - _checkPermissions', message: 'Permisos Bluetooth verificados. Concedidos: $_bluetoothPermissionGranted');
       });
     } catch (e, st) {
       _errorService.logError(
@@ -54,47 +61,58 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
         error: e,
         stackTrace: st,
       );
+      _flowLogService.logFlow(script: 'receiver_screen.dart - _checkPermissions', message: 'Error al verificar permisos: ${e.toString()}');
     }
   }
 
   Future<void> _requestPermissions() async {
     try {
+      _flowLogService.logFlow(script: 'receiver_screen.dart - _requestPermissions', message: 'Solicitando permisos Bluetooth.');
       await Permission.bluetooth.request();
       await Permission.bluetoothConnect.request();
       await Permission.bluetoothScan.request();
 
       _checkPermissions();
+      _flowLogService.logFlow(script: 'receiver_screen.dart - _requestPermissions', message: 'Solicitud de permisos Bluetooth completada.');
     } catch (e, st) {
       _errorService.logError(
         script: 'receiver_screen.dart - _requestPermissions',
         error: e,
         stackTrace: st,
       );
+      _flowLogService.logFlow(script: 'receiver_screen.dart - _requestPermissions', message: 'Error al solicitar permisos: ${e.toString()}');
     }
   }
 
   void _connectToEmitter() {
     try {
+      _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Iniciando proceso de conexión.');
       if (_codeController.text.length != 6) {
+        _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Código de vinculación inválido.');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('El código debe tener 6 dígitos')),
         );
         return;
       }
 
+      _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Código de vinculación válido. Inicializando servicio Bluetooth.');
       // Implementar la lógica de conexión Bluetooth
       final bluetoothService = BluetoothConnectionService();
       bluetoothService.initialize().then((_) {
+        _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Servicio Bluetooth inicializado. Buscando dispositivos.');
         // Buscar dispositivos y conectar usando el código
         bluetoothService.discoverDevices().then((devices) {
+          _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Dispositivos encontrados: ${devices.length}.');
           // Aquí deberíamos implementar la lógica para verificar el código
           // y conectar con el dispositivo correcto
 
+          _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Lógica de conexión con dispositivo específico pendiente.');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Conectando... Por favor espere')),
           );
 
           // Por ahora, simplemente navegamos a la siguiente pantalla
+          _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Navegando a la pantalla de visualización de notificaciones (temporal).');
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -107,6 +125,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
             error: e,
             stackTrace: st,
           );
+           _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Error al buscar dispositivos: ${e.toString()}');
            ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error al buscar dispositivos: ${e.toString()}')),
           );
@@ -117,6 +136,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
           error: e,
           stackTrace: st,
         );
+         _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Error al inicializar Bluetooth: ${e.toString()}');
          ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al inicializar Bluetooth: ${e.toString()}')),
         );
@@ -127,6 +147,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
         error: e,
         stackTrace: st,
       );
+       _flowLogService.logFlow(script: 'receiver_screen.dart - _connectToEmitter', message: 'Error general en el proceso de conexión: ${e.toString()}');
        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error general al conectar: ${e.toString()}')),
       );
@@ -179,8 +200,11 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
 
   @override
   Widget build(BuildContext context) {
+    _flowLogService.logFlow(script: 'receiver_screen.dart - build', message: 'Construyendo UI de la pantalla del receptor.');
     return Scaffold(
-      appBar: AppBar(title: const Text('Configuración del Receptor')),
+      appBar: AppBar(
+        title: const Text('Modo Receptor'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
@@ -193,6 +217,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
                 onToggleExpanded: () {
                   setState(() {
                     _isPermissionsCardExpanded = !_isPermissionsCardExpanded;
+                    _flowLogService.logFlow(script: 'receiver_screen.dart - build', message: 'Card "Verificar Permisos" ${_isPermissionsCardExpanded ? "expandida" : "colapsada"}.');
                   });
                 },
                 content: Column(
@@ -217,6 +242,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
                 onToggleExpanded: () {
                   setState(() {
                     _isPairingCodeCardExpanded = !_isPairingCodeCardExpanded;
+                     _flowLogService.logFlow(script: 'receiver_screen.dart - build', message: 'Card "Ingresar Código" ${_isPairingCodeCardExpanded ? "expandida" : "colapsada"}.');
                   });
                 },
                 content: Column(
@@ -252,8 +278,8 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
                 isExpanded: _isConnectionStatusCardExpanded,
                 onToggleExpanded: () {
                   setState(() {
-                    _isConnectionStatusCardExpanded =
-                        !_isConnectionStatusCardExpanded;
+                    _isConnectionStatusCardExpanded = !_isConnectionStatusCardExpanded;
+                     _flowLogService.logFlow(script: 'receiver_screen.dart - build', message: 'Card "Estado de la Conexión" ${_isConnectionStatusCardExpanded ? "expandida" : "colapsada"}.');
                   });
                 },
                 content: const Center(
