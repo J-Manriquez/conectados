@@ -12,6 +12,11 @@ class StorageService {
   // Clave para almacenar dispositivos vinculados
   static const String _pairedDevicesKey = 'paired_devices';
   static const String _selectedAppsKey = 'selected_apps';
+  // Nueva clave para almacenar el código único del usuario
+  static const String _uniqueCodeKey = 'unique_user_code';
+  // Nueva clave para almacenar el modo de conexión preferido
+  static const String _connectionModeKey = 'connection_mode'; // 'bluetooth' o 'internet'
+
 
   final FlowLogService _flowLogService = FlowLogService(); // Instancia de FlowLogService
   final ErrorService _errorService = ErrorService(); // Instancia de ErrorService
@@ -135,6 +140,81 @@ class StorageService {
       );
       _flowLogService.logFlow(script: 'storage_service.dart - getSelectedAppPackages', message: 'Error al obtener paquetes de aplicaciones seleccionadas: ${e.toString()}');
       return []; // Devolver lista vacía en caso de error
+    }
+  }
+
+  // --- Nuevos métodos para el código único y modo de conexión ---
+
+  // Guardar el código único del usuario
+  Future<void> saveUniqueCode(String code) async {
+    _flowLogService.logFlow(script: 'storage_service.dart - saveUniqueCode', message: 'Intentando guardar código único: $code.');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_uniqueCodeKey, code);
+      _flowLogService.logFlow(script: 'storage_service.dart - saveUniqueCode', message: 'Código único guardado con éxito.');
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'storage_service.dart - saveUniqueCode',
+        error: e,
+        stackTrace: st,
+      );
+      _flowLogService.logFlow(script: 'storage_service.dart - saveUniqueCode', message: 'Error al guardar código único: ${e.toString()}');
+    }
+  }
+
+  // Obtener el código único del usuario
+  Future<String?> getUniqueCode() async {
+    _flowLogService.logFlow(script: 'storage_service.dart - getUniqueCode', message: 'Intentando obtener código único.');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? code = prefs.getString(_uniqueCodeKey);
+      _flowLogService.logFlow(script: 'storage_service.dart - getUniqueCode', message: 'Código único obtenido: ${code ?? "ninguno"}.');
+      return code;
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'storage_service.dart - getUniqueCode',
+        error: e,
+        stackTrace: st,
+      );
+      _flowLogService.logFlow(script: 'storage_service.dart - getUniqueCode', message: 'Error al obtener código único: ${e.toString()}');
+      return null; // Devolver null en caso de error
+    }
+  }
+
+  // Guardar el modo de conexión preferido
+  Future<void> saveConnectionMode(String mode) async {
+    _flowLogService.logFlow(script: 'storage_service.dart - saveConnectionMode', message: 'Intentando guardar modo de conexión: $mode.');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_connectionModeKey, mode);
+      _flowLogService.logFlow(script: 'storage_service.dart - saveConnectionMode', message: 'Modo de conexión guardado con éxito.');
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'storage_service.dart - saveConnectionMode',
+        error: e,
+        stackTrace: st,
+      );
+      _flowLogService.logFlow(script: 'storage_service.dart - saveConnectionMode', message: 'Error al guardar modo de conexión: ${e.toString()}');
+    }
+  }
+
+  // Obtener el modo de conexión preferido
+  Future<String> getConnectionMode() async {
+    _flowLogService.logFlow(script: 'storage_service.dart - getConnectionMode', message: 'Intentando obtener modo de conexión.');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Por defecto, usar Bluetooth si no hay nada guardado
+      String mode = prefs.getString(_connectionModeKey) ?? 'bluetooth';
+      _flowLogService.logFlow(script: 'storage_service.dart - getConnectionMode', message: 'Modo de conexión obtenido: $mode.');
+      return mode;
+    } catch (e, st) {
+      _errorService.logError(
+        script: 'storage_service.dart - getConnectionMode',
+        error: e,
+        stackTrace: st,
+      );
+      _flowLogService.logFlow(script: 'storage_service.dart - getConnectionMode', message: 'Error al obtener modo de conexión: ${e.toString()}');
+      return 'bluetooth'; // Devolver Bluetooth por defecto en caso de error
     }
   }
 }

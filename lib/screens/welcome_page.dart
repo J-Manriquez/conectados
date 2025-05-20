@@ -44,7 +44,7 @@ class WelcomePage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const EmitterSetupPage(),
+                        builder: (context) => const EmitterScreen(),
                       ),
                     );
                   } catch (e, st) {

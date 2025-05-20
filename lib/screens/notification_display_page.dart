@@ -1,25 +1,38 @@
 import 'package:flutter/material.dart';
 import '../models/notification_item.dart';
-import '../services/bluetooth_service.dart';
+// import '../services/bluetooth_service.dart'; // Ya no necesitamos el servicio Bluetooth directamente aquí
 import '../services/error_service.dart'; // Importar el servicio de errores
+import 'dart:async'; // Importar para StreamSubscription
 
 class NotificationDisplayPage extends StatefulWidget {
-  const NotificationDisplayPage({super.key});
+  // Añadir el parámetro notificationsStream al constructor
+  final Stream<List<NotificationItem>> notificationsStream;
+
+  const NotificationDisplayPage({
+    super.key,
+    required this.notificationsStream, // Hacer el parámetro requerido
+  });
 
   @override
   State<NotificationDisplayPage> createState() => _NotificationDisplayPageState();
 }
 
 class _NotificationDisplayPageState extends State<NotificationDisplayPage> {
+  // Cambiar la lista para que contenga NotificationItem directamente, ya que el stream ahora emite List<NotificationItem>
   final List<NotificationItem> _notifications = [];
-  final BluetoothConnectionService _bluetoothService = BluetoothConnectionService();
+  // final BluetoothConnectionService _bluetoothService = BluetoothConnectionService(); // Ya no necesitamos esta instancia
   final ErrorService _errorService = ErrorService(); // Instancia del servicio de errores
+
+  // Suscripción al stream de notificaciones
+  StreamSubscription<List<NotificationItem>>? _notificationsSubscription;
+
 
   @override
   void initState() {
     super.initState();
     try { // Añadir try-catch
-      _listenForNotifications();
+      // Llamar a _listenForNotifications con el stream pasado al widget
+      _listenForNotifications(widget.notificationsStream);
     } catch (e, st) { // Capturar error y stack trace
       _errorService.logError( // Registrar el error
         script: 'notification_display_page.dart - initState',
@@ -29,12 +42,24 @@ class _NotificationDisplayPageState extends State<NotificationDisplayPage> {
     }
   }
 
-  void _listenForNotifications() {
-    _bluetoothService.receivedNotifications.listen((notification) {
+  @override
+  void dispose() {
+    // Cancelar la suscripción al stream cuando el widget se destruye
+    _notificationsSubscription?.cancel();
+    super.dispose();
+  }
+
+  // Modificar el método para aceptar el stream como parámetro
+  void _listenForNotifications(Stream<List<NotificationItem>> stream) {
+    // Suscribirse al stream pasado
+    _notificationsSubscription = stream.listen((newNotifications) {
       try { // Añadir try-catch dentro del listener
         setState(() {
-          // Añadir al principio para mostrar las más recientes primero
-          _notifications.insert(0, notification);
+          // Limpiar la lista actual y añadir todas las nuevas notificaciones
+          _notifications.clear();
+          _notifications.addAll(newNotifications);
+          // Opcional: ordenar si quieres las más recientes primero, aunque el stream combinado ya debería manejarse así
+          // _notifications.sort((a, b) => b.time.compareTo(a.time)); // Si NotificationItem tiene un campo 'time' comparable
         });
       } catch (e, st) { // Capturar error y stack trace
         _errorService.logError( // Registrar el error
