@@ -42,33 +42,33 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
         return;
       }
 
-      // Filtrado más seguro sin operadores !
-      apps = apps.where((app) {
-        final package = app.packageName;
-        if (package == null) return false;
-        return !package.startsWith('com.android.') &&
-               !package.startsWith('com.google.') &&
-               !package.contains('.provider') &&
-               !package.contains('.core');
-      }).toList();
+      // Eliminar el filtrado, mostrar todas las apps
+      // apps = apps.where((app) {
+      //   final package = app.packageName;
+      //   if (package == null) return false;
+      //   return !package.startsWith('com.android.') &&
+      //          !package.startsWith('com.google.') &&
+      //          !package.contains('.provider') &&
+      //          !package.contains('.core');
+      // }).toList();
       
-      if (apps.isEmpty) {
-        print('No se encontraron aplicaciones o no se tienen los permisos necesarios');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudieron cargar las aplicaciones. Verifica los permisos de la aplicación.'),
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
+      // if (apps.isEmpty) {
+      //   print('No se encontraron aplicaciones o no se tienen los permisos necesarios');
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(
+      //       content: Text('No se pudieron cargar las aplicaciones. Verifica los permisos de la aplicación.'),
+      //       duration: Duration(seconds: 5),
+      //     ),
+      //   );
+      // }
       
-      // Filtrar aplicaciones del sistema si es necesario
-      apps = apps.where((app) {
-        final package = app.packageName;
-        if (package == null) return false;
-        return !package.startsWith('com.android') &&
-               !package.startsWith('com.google.android');
-      }).toList();
+      // Eliminar también este filtrado
+      // apps = apps.where((app) {
+      //   final package = app.packageName;
+      //   if (package == null) return false;
+      //   return !package.startsWith('com.android') &&
+      //          !package.startsWith('com.google.android');
+      // }).toList();
       
       // Ordenar alfabéticamente
       apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
@@ -184,14 +184,15 @@ Future<List<AppInfo>> _loadAppsInBackground(_) async {
         .where((app) => app.packageName?.isNotEmpty ?? false)
         .toList();
 
-    apps = apps.where((app) {
-      final package = app.packageName;
-      if (package == null) return false;
-      return !package.startsWith('com.android.') &&
-             !package.startsWith('com.google.') &&
-             !package.contains('.provider') &&
-             !package.contains('.core');
-    }).toList();
+    // No filtrar, mostrar todas las apps
+    // apps = apps.where((app) {
+    //   final package = app.packageName;
+    //   if (package == null) return false;
+    //   return !package.startsWith('com.android.') &&
+    //          !package.startsWith('com.google.') &&
+    //          !package.contains('.provider') &&
+    //          !package.contains('.core');
+    // }).toList();
 
     apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
     return apps;
