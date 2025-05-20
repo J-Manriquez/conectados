@@ -29,11 +29,11 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
     });
     
     try {
-      // Verificar permiso QUERY_ALL_PACKAGES
-      List<AppInfo> apps = await InstalledApps.getInstalledApps(false, true);
+      List<AppInfo> apps = (await InstalledApps.getInstalledApps(false, true))
+          .where((app) => app.packageName?.isNotEmpty ?? false)
+          .toList();
 
       if (apps.isEmpty) {
-        print('No se encontraron aplicaciones');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No se encontraron aplicaciones instaladas'),
@@ -42,14 +42,16 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
         );
         return;
       }
-      // Filtrar aplicaciones del sistema de manera más precisa
-      apps = apps.where((app) => 
-        app.packageName != null && 
-        !app.packageName.startsWith('com.android.') &&  // Quitar !
-        !app.packageName.startsWith('com.google.') &&   // Quitar !
-        !app.packageName.contains('.provider') &&       // Quitar !
-        !app.packageName.contains('.core')              // Quitar !
-      ).toList();
+
+      // Filtrado más seguro sin operadores !
+      apps = apps.where((app) {
+        final package = app.packageName;
+        if (package == null) return false;
+        return !package.startsWith('com.android.') &&
+               !package.startsWith('com.google.') &&
+               !package.contains('.provider') &&
+               !package.contains('.core');
+      }).toList();
       
       if (apps.isEmpty) {
         print('No se encontraron aplicaciones o no se tienen los permisos necesarios');
