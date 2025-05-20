@@ -37,7 +37,6 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       final RootIsolateToken? token = RootIsolateToken.instance;
       if (token == null) {
         print('[_loadApps] Error: No se pudo obtener RootIsolateToken.');
-        // Manejar el error, quizás mostrar un mensaje al usuario
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Error interno al cargar aplicaciones.'),
@@ -65,9 +64,9 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
         return;
       }
 
-      // Ordenar alfabéticamente, manejando posibles nombres nulos
-      apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
-      print('[_loadApps] Aplicaciones ordenadas.'); // Log de ordenamiento
+      // Eliminar ordenamiento para simplificar
+      // apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+      // print('[_loadApps] Aplicaciones ordenadas.'); // Log de ordenamiento
 
       // Cargar aplicaciones previamente seleccionadas
       List<String> savedPackages = await _storageService.getSelectedAppPackages();
@@ -89,7 +88,6 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
         _isLoading = false;
       });
 
-      // Mostrar un mensaje de error más descriptivo
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al cargar aplicaciones: $e'),
@@ -98,7 +96,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       );
     }
   }
-  
+
   void _toggleAppSelection(AppInfo app) {
     setState(() {
       if (_selectedApps.contains(app)) {
@@ -111,22 +109,22 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       print('[_toggleAppSelection] Apps seleccionadas: ${_selectedApps.length}'); // Log de total seleccionadas
     });
   }
-  
+
   void _saveSelection() async {
     print('[_saveSelection] Guardando selección...'); // Log de inicio de guardado
     // Guardar la selección de aplicaciones
     List<String> selectedPackages = _selectedApps
         .where((app) => app.packageName != null)
-        .map((app) => app.packageName)
+        .map((app) => app.packageName!)
         .toList();
     print('[_saveSelection] Paquetes seleccionados para guardar: ${selectedPackages.length}'); // Log de paquetes a guardar
 
     // Convertir a nuestro modelo de AppInfo para guardar
     List<MyAppInfo.AppInfo> myAppInfoList = _selectedApps
-        .where((app) => app.name != null)
+        .where((app) => app.name != null && app.packageName != null) // Asegurar que name y packageName no sean nulos
         .map((app) => MyAppInfo.AppInfo(
-          name: app.name,
-          packageName: app.packageName,
+          name: app.name!,
+          packageName: app.packageName!,
           isSelected: true,
           color: Colors.blue, // Color predeterminado
           iconData: Icons.android, // Icono predeterminado
@@ -141,7 +139,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
     Navigator.pop(context, selectedPackages);
     print('[_saveSelection] Navegando de regreso.'); // Log de navegación
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,8 +164,9 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
                   leading: app.icon != null
                       ? Image.memory(app.icon!, width: 40, height: 40)
                       : const Icon(Icons.android),
-                  title: Text(app.name),
-                  subtitle: Text(app.packageName),
+                  // Usar ?? '' para manejar posibles valores nulos en name y packageName
+                  title: Text(app.name ?? 'Sin nombre'),
+                  subtitle: Text(app.packageName ?? ''),
                   trailing: Checkbox(
                     value: isSelected,
                     onChanged: (bool? value) {
@@ -187,10 +186,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
 // Modificar la función para aceptar el token
 Future<List<AppInfo>> _loadAppsInBackground(RootIsolateToken token) async {
   try {
-    // Asegurar que el BinaryMessenger esté inicializado para el isolate de background
-    // Esto es necesario para que los plugins que usan platform channels funcionen en isolates.
     print('[_loadAppsInBackground] Inicializando BackgroundIsolateBinaryMessenger...'); // Log de inicialización
-    // Usar el token recibido
     BackgroundIsolateBinaryMessenger.ensureInitialized(token);
     print('[_loadAppsInBackground] BackgroundIsolateBinaryMessenger inicializado.'); // Log de inicialización completada
 
@@ -201,19 +197,9 @@ Future<List<AppInfo>> _loadAppsInBackground(RootIsolateToken token) async {
         .toList();
     print('[_loadAppsInBackground] Total de aplicaciones obtenidas: ${apps.length}'); // Log de total obtenidas
 
-    // No filtrar, mostrar todas las apps
-    // apps = apps.where((app) {
-    //   final package = app.packageName;
-    //   if (package == null) return false;
-    //   return !package.startsWith('com.android.') &&
-    //          !package.startsWith('com.google.') &&
-    //          !package.contains('.provider') &&
-    //          !package.contains('.core');
-    // }).toList();
-
-    // Ordenar alfabéticamente, manejando posibles nombres nulos
-    apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
-    print('[_loadAppsInBackground] Aplicaciones ordenadas.'); // Log de ordenamiento
+    // Eliminar ordenamiento para simplificar
+    // apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+    // print('[_loadAppsInBackground] Aplicaciones ordenadas.'); // Log de ordenamiento
     return apps;
   } catch (e) {
     print('[_loadAppsInBackground] Error en segundo plano: $e'); // Log de error
