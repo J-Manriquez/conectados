@@ -14,54 +14,53 @@ class ReceiverSetupPage extends StatefulWidget {
 class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
   bool _bluetoothPermissionGranted = false;
   final TextEditingController _codeController = TextEditingController();
-  
+
   // Variables para controlar la visibilidad de cada card
   bool _isPermissionsCardExpanded = false;
   bool _isPairingCodeCardExpanded = false;
   bool _isConnectionStatusCardExpanded = false;
-  
+
   @override
   void initState() {
     super.initState();
     _checkPermissions();
   }
-  
+
   @override
   void dispose() {
     _codeController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _checkPermissions() async {
     final bluetoothStatus = await Permission.bluetooth.status;
     final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
     final bluetoothScanStatus = await Permission.bluetoothScan.status;
-    
+
     setState(() {
-      _bluetoothPermissionGranted = bluetoothStatus.isGranted && 
-                                   bluetoothConnectStatus.isGranted && 
-                                   bluetoothScanStatus.isGranted;
+      _bluetoothPermissionGranted =
+          bluetoothStatus.isGranted &&
+          bluetoothConnectStatus.isGranted &&
+          bluetoothScanStatus.isGranted;
     });
   }
-  
+
   Future<void> _requestPermissions() async {
     await Permission.bluetooth.request();
     await Permission.bluetoothConnect.request();
     await Permission.bluetoothScan.request();
-    
+
     _checkPermissions();
   }
-  
+
   void _connectToEmitter() {
     if (_codeController.text.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('El código debe tener 6 dígitos'),
-        ),
+        const SnackBar(content: Text('El código debe tener 6 dígitos')),
       );
       return;
     }
-    
+
     // Implementar la lógica de conexión Bluetooth
     final bluetoothService = BluetoothConnectionService();
     bluetoothService.initialize().then((_) {
@@ -69,13 +68,11 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
       bluetoothService.discoverDevices().then((devices) {
         // Aquí deberíamos implementar la lógica para verificar el código
         // y conectar con el dispositivo correcto
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Conectando... Por favor espere'),
-          ),
+          const SnackBar(content: Text('Conectando... Por favor espere')),
         );
-        
+
         // Por ahora, simplemente navegamos a la siguiente pantalla
         Navigator.push(
           context,
@@ -86,7 +83,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
       });
     });
   }
-  
+
   // Widget reutilizable para crear cards con control de visibilidad
   Widget _buildCard({
     required String title,
@@ -103,10 +100,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                Text(title, style: Theme.of(context).textTheme.titleLarge),
                 IconButton(
                   icon: Icon(
                     isExpanded ? Icons.visibility : Icons.visibility_off,
@@ -118,7 +112,7 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
               ],
             ),
           ),
-          
+
           // Contenido de la card que se muestra/oculta
           if (isExpanded)
             Padding(
@@ -133,89 +127,85 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Configuración del Receptor'),
-      ),
+      appBar: AppBar(title: const Text('Configuración del Receptor')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCard(
-              title: 'Estado de Permisos',
-              isExpanded: _isPermissionsCardExpanded,
-              onToggleExpanded: () {
-                setState(() {
-                  _isPermissionsCardExpanded = !_isPermissionsCardExpanded;
-                });
-              },
-              content: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  PermissionItem(
-                    title: 'Bluetooth',
-                    isGranted: _bluetoothPermissionGranted,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _requestPermissions,
-                    child: const Text('Solicitar Permisos'),
-                  ),
-                ],
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildCard(
+                title: 'Estado de Permisos',
+                isExpanded: _isPermissionsCardExpanded,
+                onToggleExpanded: () {
+                  setState(() {
+                    _isPermissionsCardExpanded = !_isPermissionsCardExpanded;
+                  });
+                },
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PermissionItem(
+                      title: 'Bluetooth',
+                      isGranted: _bluetoothPermissionGranted,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _requestPermissions,
+                      child: const Text('Solicitar Permisos'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildCard(
-              title: 'Código de Vinculación',
-              isExpanded: _isPairingCodeCardExpanded,
-              onToggleExpanded: () {
-                setState(() {
-                  _isPairingCodeCardExpanded = !_isPairingCodeCardExpanded;
-                });
-              },
-              content: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _codeController,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'Código de 6 dígitos',
-                    ),
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      letterSpacing: 8,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+              const SizedBox(height: 16),
+              _buildCard(
+                title: 'Código de Vinculación',
+                isExpanded: _isPairingCodeCardExpanded,
+                onToggleExpanded: () {
+                  setState(() {
+                    _isPairingCodeCardExpanded = !_isPairingCodeCardExpanded;
+                  });
+                },
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _codeController,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'Código de 6 dígitos',
                       ),
-                      onPressed: _connectToEmitter,
-                      child: const Text('Conectar'),
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 24, letterSpacing: 8),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: _connectToEmitter,
+                        child: const Text('Conectar'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _buildCard(
+              const SizedBox(height: 16),
+              _buildCard(
                 title: 'Estado de Conexión',
                 isExpanded: _isConnectionStatusCardExpanded,
                 onToggleExpanded: () {
                   setState(() {
-                    _isConnectionStatusCardExpanded = !_isConnectionStatusCardExpanded;
+                    _isConnectionStatusCardExpanded =
+                        !_isConnectionStatusCardExpanded;
                   });
                 },
                 content: const Center(
@@ -225,8 +215,10 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
                   ),
                 ),
               ),
-            ),
-          ],
+              // Espacio adicional al final para evitar que el contenido quede oculto por el teclado
+              const SizedBox(height: 80),
+            ],
+          ),
         ),
       ),
     );
