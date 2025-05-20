@@ -45,15 +45,14 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       // Filtrar aplicaciones del sistema de manera más precisa
       apps = apps.where((app) => 
         app.packageName != null && 
-        !app.packageName!.startsWith('com.android.') &&
-        !app.packageName!.startsWith('com.google.') &&
-        !app.packageName!.contains('.provider') &&
-        !app.packageName!.contains('.core')
+        !app.packageName.startsWith('com.android.') &&  // Quitar !
+        !app.packageName.startsWith('com.google.') &&   // Quitar !
+        !app.packageName.contains('.provider') &&       // Quitar !
+        !app.packageName.contains('.core')              // Quitar !
       ).toList();
       
       if (apps.isEmpty) {
         print('No se encontraron aplicaciones o no se tienen los permisos necesarios');
-        // Mostrar un mensaje al usuario
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No se pudieron cargar las aplicaciones. Verifica los permisos de la aplicación.'),
@@ -65,8 +64,8 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       // Filtrar aplicaciones del sistema si es necesario
       apps = apps.where((app) => 
         app.packageName != null && 
-        !app.packageName!.startsWith('com.android') &&
-        !app.packageName!.startsWith('com.google.android')
+        !app.packageName.startsWith('com.android') &&   // Quitar !
+        !app.packageName.startsWith('com.google.android') // Quitar !
       ).toList();
       
       // Ordenar alfabéticamente
