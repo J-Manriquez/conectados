@@ -46,10 +46,10 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       apps = apps.where((app) {
         final package = app.packageName;
         if (package == null) return false;
-        return package.startsWith('com.android.') &&
-               package.startsWith('com.google.') &&
-               package.contains('.provider') &&
-               package.contains('.core');
+        return !package.startsWith('com.android.') &&
+               !package.startsWith('com.google.') &&
+               !package.contains('.provider') &&
+               !package.contains('.core');
       }).toList();
       
       if (apps.isEmpty) {
