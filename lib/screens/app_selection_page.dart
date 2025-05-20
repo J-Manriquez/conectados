@@ -64,20 +64,21 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
         );
         return;
       }
-      
-      // Ordenar alfabéticamente
-      apps.sort((a, b) => (a.name).compareTo(b.name));
+
+      // Ordenar alfabéticamente, manejando posibles nombres nulos
+      apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
       print('[_loadApps] Aplicaciones ordenadas.'); // Log de ordenamiento
-      
+
       // Cargar aplicaciones previamente seleccionadas
       List<String> savedPackages = await _storageService.getSelectedAppPackages();
       print('[_loadApps] Paquetes guardados cargados: ${savedPackages.length}'); // Log de paquetes guardados
-      
+
       setState(() {
         _apps = apps;
         _selectedApps = apps.where((app) {
           final package = app.packageName;
-          return savedPackages.contains(package);
+          // Asegurarse de que el paquete no sea nulo antes de verificar si está guardado
+          return package != null && savedPackages.contains(package);
         }).toList();
         _isLoading = false;
         print('[_loadApps] Estado actualizado. Total apps: ${_apps.length}, Apps seleccionadas: ${_selectedApps.length}'); // Log de estado final
@@ -195,7 +196,8 @@ Future<List<AppInfo>> _loadAppsInBackground(RootIsolateToken token) async {
 
     print('[_loadAppsInBackground] Obteniendo aplicaciones instaladas...'); // Log de inicio
     List<AppInfo> apps = (await InstalledApps.getInstalledApps(false, true))
-        .where((app) => app.packageName.isNotEmpty)
+        // Mantener el filtro para asegurar que el packageName no sea nulo
+        .where((app) => app.packageName?.isNotEmpty ?? false)
         .toList();
     print('[_loadAppsInBackground] Total de aplicaciones obtenidas: ${apps.length}'); // Log de total obtenidas
 
@@ -209,7 +211,8 @@ Future<List<AppInfo>> _loadAppsInBackground(RootIsolateToken token) async {
     //          !package.contains('.core');
     // }).toList();
 
-    apps.sort((a, b) => (a.name).compareTo(b.name));
+    // Ordenar alfabéticamente, manejando posibles nombres nulos
+    apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
     print('[_loadAppsInBackground] Aplicaciones ordenadas.'); // Log de ordenamiento
     return apps;
   } catch (e) {
