@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
 import '../models/app_info.dart' as MyAppInfo;
 import '../services/storage_service.dart';
+import 'dart:ui'; // Importar para RootIsolateToken
 
 class AppSelectionPage extends StatefulWidget {
   const AppSelectionPage({super.key});
@@ -17,21 +19,39 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
   List<AppInfo> _selectedApps = [];
   bool _isLoading = true;
   final StorageService _storageService = StorageService();
-  
+
   @override
   void initState() {
     super.initState();
     _loadApps();
   }
-  
+
   Future<void> _loadApps() async {
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       print('[_loadApps] Iniciando carga de aplicaciones...'); // Log de inicio
-      var apps = await compute(_loadAppsInBackground, null);
+      // Obtener el token del isolate principal
+      final RootIsolateToken? token = RootIsolateToken.instance;
+      if (token == null) {
+        print('[_loadApps] Error: No se pudo obtener RootIsolateToken.');
+        // Manejar el error, quizás mostrar un mensaje al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error interno al cargar aplicaciones.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Pasar el token a la función de background
+      var apps = await compute(_loadAppsInBackground, token);
       print('[_loadApps] Aplicaciones cargadas en segundo plano: ${apps.length}'); // Log de cantidad
 
       if (apps.isEmpty) {
@@ -46,7 +66,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       }
       
       // Ordenar alfabéticamente
-      apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+      apps.sort((a, b) => (a.name).compareTo(b.name));
       print('[_loadApps] Aplicaciones ordenadas.'); // Log de ordenamiento
       
       // Cargar aplicaciones previamente seleccionadas
@@ -57,7 +77,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
         _apps = apps;
         _selectedApps = apps.where((app) {
           final package = app.packageName;
-          return package != null && savedPackages.contains(package);
+          return savedPackages.contains(package);
         }).toList();
         _isLoading = false;
         print('[_loadApps] Estado actualizado. Total apps: ${_apps.length}, Apps seleccionadas: ${_selectedApps.length}'); // Log de estado final
@@ -67,7 +87,7 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       setState(() {
         _isLoading = false;
       });
-      
+
       // Mostrar un mensaje de error más descriptivo
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -96,27 +116,27 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
     // Guardar la selección de aplicaciones
     List<String> selectedPackages = _selectedApps
         .where((app) => app.packageName != null)
-        .map((app) => app.packageName!)
+        .map((app) => app.packageName)
         .toList();
     print('[_saveSelection] Paquetes seleccionados para guardar: ${selectedPackages.length}'); // Log de paquetes a guardar
-    
+
     // Convertir a nuestro modelo de AppInfo para guardar
     List<MyAppInfo.AppInfo> myAppInfoList = _selectedApps
-        .where((app) => app.packageName != null && app.name != null)
+        .where((app) => app.name != null)
         .map((app) => MyAppInfo.AppInfo(
-          name: app.name!,
-          packageName: app.packageName!,
+          name: app.name,
+          packageName: app.packageName,
           isSelected: true,
           color: Colors.blue, // Color predeterminado
           iconData: Icons.android, // Icono predeterminado
         ))
         .toList();
     print('[_saveSelection] Convertidas a MyAppInfo: ${myAppInfoList.length}'); // Log de conversión
-    
+
     // Guardar en preferencias
     await _storageService.saveSelectedApps(myAppInfoList);
     print('[_saveSelection] Selección guardada en StorageService.'); // Log de guardado completado
-    
+
     Navigator.pop(context, selectedPackages);
     print('[_saveSelection] Navegando de regreso.'); // Log de navegación
   }
@@ -140,13 +160,13 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
               itemBuilder: (context, index) {
                 AppInfo app = _apps[index];
                 bool isSelected = _selectedApps.contains(app);
-                
+
                 return ListTile(
                   leading: app.icon != null
                       ? Image.memory(app.icon!, width: 40, height: 40)
                       : const Icon(Icons.android),
-                  title: Text(app.name ?? 'Sin nombre'),
-                  subtitle: Text(app.packageName ?? ''),
+                  title: Text(app.name),
+                  subtitle: Text(app.packageName),
                   trailing: Checkbox(
                     value: isSelected,
                     onChanged: (bool? value) {
@@ -163,12 +183,19 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
   }
 }
 
-// Añadir esta función al final del archivo
-Future<List<AppInfo>> _loadAppsInBackground(_) async {
+// Modificar la función para aceptar el token
+Future<List<AppInfo>> _loadAppsInBackground(RootIsolateToken token) async {
   try {
+    // Asegurar que el BinaryMessenger esté inicializado para el isolate de background
+    // Esto es necesario para que los plugins que usan platform channels funcionen en isolates.
+    print('[_loadAppsInBackground] Inicializando BackgroundIsolateBinaryMessenger...'); // Log de inicialización
+    // Usar el token recibido
+    BackgroundIsolateBinaryMessenger.ensureInitialized(token);
+    print('[_loadAppsInBackground] BackgroundIsolateBinaryMessenger inicializado.'); // Log de inicialización completada
+
     print('[_loadAppsInBackground] Obteniendo aplicaciones instaladas...'); // Log de inicio
     List<AppInfo> apps = (await InstalledApps.getInstalledApps(false, true))
-        .where((app) => app.packageName?.isNotEmpty ?? false)
+        .where((app) => app.packageName.isNotEmpty)
         .toList();
     print('[_loadAppsInBackground] Total de aplicaciones obtenidas: ${apps.length}'); // Log de total obtenidas
 
@@ -182,7 +209,7 @@ Future<List<AppInfo>> _loadAppsInBackground(_) async {
     //          !package.contains('.core');
     // }).toList();
 
-    apps.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+    apps.sort((a, b) => (a.name).compareTo(b.name));
     print('[_loadAppsInBackground] Aplicaciones ordenadas.'); // Log de ordenamiento
     return apps;
   } catch (e) {
