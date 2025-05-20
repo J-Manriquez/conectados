@@ -13,11 +13,12 @@ android {
     compileOptions {
         //sourceCompatibility = JavaVersion.VERSION_11
         //targetCompatibility = JavaVersion.VERSION_11
-        // Flag to enable support for the new language APIs
-        coreLibraryDesugaringEnabled = true
         // Sets Java compatibility to Java 8
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+        
+        // Habilitar desugaring usando la sintaxis correcta para Kotlin DSL
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
