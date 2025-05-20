@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:notification_listener_service/notification_event.dart';
 import 'package:notification_listener_service/notification_listener_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
 import '../models/notification_item.dart';
 import '../models/app_info.dart';
 
@@ -17,6 +18,30 @@ class NotificationService {
   List<String> _selectedAppPackages = [];
   
   Future<void> initialize() async {
+    // Inicializar awesome_notifications
+    await AwesomeNotifications().initialize(
+      'resource://drawable/app_icon',
+      [
+        NotificationChannel(
+          channelKey: 'conectados_channel',
+          channelName: 'Notificaciones de Conectados',
+          channelDescription: 'Canal para notificaciones de la aplicación Conectados',
+          defaultColor: Colors.blue,
+          ledColor: Colors.white,
+          importance: NotificationImportance.High,
+          playSound: true,
+          enableVibration: true
+        ),
+      ]
+    );
+    
+    // Solicitar permisos de notificación
+    await AwesomeNotifications().isNotificationAllowed().then((isAllowed) {
+      if (!isAllowed) {
+        AwesomeNotifications().requestPermissionToSendNotifications();
+      }
+    });
+    
     // Cargar aplicaciones seleccionadas
     await _loadSelectedApps();
     
@@ -38,7 +63,7 @@ class NotificationService {
         packageName: event.packageName ?? '',
         appName: event.packageName ?? 'Desconocido',
         title: event.title ?? '',
-        content: event.content ?? '',  // Nota: cambié event.text a event.content según la documentación
+        content: event.content ?? '',
         timestamp: DateTime.now(),
         time: DateTime.now().toString().substring(11, 16),
         color: _getColorForApp(event.packageName),
@@ -47,7 +72,26 @@ class NotificationService {
       
       // Enviar la notificación al stream
       _notificationController.add(notification);
+      
+      // Mostrar la notificación usando awesome_notifications
+      _showNotification(notification);
     }
+  }
+  
+  Future<void> _showNotification(NotificationItem notification) async {
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        channelKey: 'conectados_channel',
+        title: notification.title,
+        body: notification.content,
+        color: notification.color,
+        notificationLayout: NotificationLayout.Default,
+        // Usar el paquete de la aplicación para mostrar su icono
+        icon: 'resource://drawable/app_icon',
+        payload: {'packageName': notification.packageName}
+      ),
+    );
   }
   
   Color _getColorForApp(String? packageName) {

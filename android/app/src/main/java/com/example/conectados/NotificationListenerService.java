@@ -12,7 +12,7 @@ import io.flutter.embedding.engine.dart.DartExecutor;
 import io.flutter.view.FlutterCallbackInformation;
 import io.flutter.embedding.engine.FlutterEngineCache;
 
-public class NotificationListenerService extends android.service.notification.NotificationListenerService {
+public class ConectadosNotificationListenerService extends android.service.notification.NotificationListenerService {
     private static final String TAG = "NotificationListener";
     private static final String CHANNEL = "com.example.conectados/notifications";
     

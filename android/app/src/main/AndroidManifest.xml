@@ -50,7 +50,7 @@
         
         <!-- Servicio para escuchar notificaciones -->
         <service
-            android:name="com.example.conectados.NotificationListenerService"
+            android:name="com.example.conectados.ConectadosNotificationListenerService"
             android:label="Conectados Notification Listener"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
