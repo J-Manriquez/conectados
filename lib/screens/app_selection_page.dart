@@ -29,8 +29,27 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
     });
     
     try {
-      // Usar la API correcta de InstalledApps con manejo de errores
-      List<AppInfo> apps = await InstalledApps.getInstalledApps(true, true);
+      // Verificar permiso QUERY_ALL_PACKAGES
+      List<AppInfo> apps = await InstalledApps.getInstalledApps(false, true);
+
+      if (apps.isEmpty) {
+        print('No se encontraron aplicaciones');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se encontraron aplicaciones instaladas'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+      // Filtrar aplicaciones del sistema de manera más precisa
+      apps = apps.where((app) => 
+        app.packageName != null && 
+        !app.packageName!.startsWith('com.android.') &&
+        !app.packageName!.startsWith('com.google.') &&
+        !app.packageName!.contains('.provider') &&
+        !app.packageName!.contains('.core')
+      ).toList();
       
       if (apps.isEmpty) {
         print('No se encontraron aplicaciones o no se tienen los permisos necesarios');
