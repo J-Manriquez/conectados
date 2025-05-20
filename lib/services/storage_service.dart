@@ -70,9 +70,7 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     String? appsJson = prefs.getString(_selectedAppsKey);
     
-    if (appsJson == null) return [];
-    
-    List<dynamic> appMaps = jsonDecode(appsJson);
+    List<dynamic> appMaps = jsonDecode(appsJson!);
     return appMaps.map<String>((app) => app['packageName'] as String).toList();
   }
 }
