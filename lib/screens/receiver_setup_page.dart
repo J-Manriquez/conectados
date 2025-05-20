@@ -15,6 +15,11 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
   bool _bluetoothPermissionGranted = false;
   final TextEditingController _codeController = TextEditingController();
   
+  // Variables para controlar la visibilidad de cada card
+  bool _isPermissionsCardExpanded = false;
+  bool _isPairingCodeCardExpanded = false;
+  bool _isConnectionStatusCardExpanded = false;
+  
   @override
   void initState() {
     super.initState();
@@ -82,6 +87,53 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
     });
   }
   
+  // Widget reutilizable para crear cards con control de visibilidad
+  Widget _buildCard({
+    required String title,
+    required bool isExpanded,
+    required VoidCallback onToggleExpanded,
+    required Widget content,
+  }) {
+    return Card(
+      child: Column(
+        children: [
+          // Cabecera de la card con el título y el icono de visibilidad
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                IconButton(
+                  icon: Icon(
+                    isExpanded ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: onToggleExpanded,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+          
+          // Contenido de la card que se muestra/oculta
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.only(
+                left: 16.0,
+                right: 16.0,
+                bottom: 16.0,
+              ),
+              child: content,
+            ),
+        ],
+      ),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -93,91 +145,83 @@ class _ReceiverSetupPageState extends State<ReceiverSetupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Estado de Permisos',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    PermissionItem(
-                      title: 'Bluetooth',
-                      isGranted: _bluetoothPermissionGranted,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _requestPermissions,
-                      child: const Text('Solicitar Permisos'),
-                    ),
-                  ],
-                ),
+            _buildCard(
+              title: 'Estado de Permisos',
+              isExpanded: _isPermissionsCardExpanded,
+              onToggleExpanded: () {
+                setState(() {
+                  _isPermissionsCardExpanded = !_isPermissionsCardExpanded;
+                });
+              },
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PermissionItem(
+                    title: 'Bluetooth',
+                    isGranted: _bluetoothPermissionGranted,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _requestPermissions,
+                    child: const Text('Solicitar Permisos'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ingresa el Código de Vinculación',
-                      style: Theme.of(context).textTheme.titleLarge,
+            _buildCard(
+              title: 'Código de Vinculación',
+              isExpanded: _isPairingCodeCardExpanded,
+              onToggleExpanded: () {
+                setState(() {
+                  _isPairingCodeCardExpanded = !_isPairingCodeCardExpanded;
+                });
+              },
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _codeController,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: 'Código de 6 dígitos',
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _codeController,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'Código de 6 dígitos',
-                      ),
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        letterSpacing: 8,
-                      ),
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      letterSpacing: 8,
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        onPressed: _connectToEmitter,
-                        child: const Text('Conectar'),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
+                      onPressed: _connectToEmitter,
+                      child: const Text('Conectar'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Estado de Conexión',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      const Center(
-                        child: Text(
-                          'Esperando ingreso del código...',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
+              child: _buildCard(
+                title: 'Estado de Conexión',
+                isExpanded: _isConnectionStatusCardExpanded,
+                onToggleExpanded: () {
+                  setState(() {
+                    _isConnectionStatusCardExpanded = !_isConnectionStatusCardExpanded;
+                  });
+                },
+                content: const Center(
+                  child: Text(
+                    'Esperando ingreso del código...',
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
