@@ -69,8 +69,14 @@ class StorageService {
   Future<List<String>> getSelectedAppPackages() async {
     final prefs = await SharedPreferences.getInstance();
     String? appsJson = prefs.getString(_selectedAppsKey);
-    
-    List<dynamic> appMaps = jsonDecode(appsJson!);
+
+    // Manejar el caso donde appsJson es null (no hay apps guardadas)
+    if (appsJson == null) {
+      return []; // Devolver una lista vacía si no hay datos guardados
+    }
+
+    // Si appsJson no es null, decodificarlo
+    List<dynamic> appMaps = jsonDecode(appsJson);
     return appMaps.map<String>((app) => app['packageName'] as String).toList();
   }
 }
