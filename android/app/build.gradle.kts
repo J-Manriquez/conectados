@@ -30,7 +30,7 @@ android {
         applicationId = "com.example.conectados"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 23  // Actualizado de 21 a 23 para compatibilidad con awesome_notifications
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
