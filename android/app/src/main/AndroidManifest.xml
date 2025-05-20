@@ -18,6 +18,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    
+    <!-- Permiso para acceder a la lista de aplicaciones instaladas -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    
     <!-- Si usas ubicación, añade este también -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <application

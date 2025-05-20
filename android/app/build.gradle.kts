@@ -46,6 +46,8 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.2.2")
+    // Añadir dependencia para acceso a paquetes instalados
+    implementation("androidx.core:core:1.10.1")
 }
 
 flutter {

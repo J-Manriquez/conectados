@@ -29,8 +29,19 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
     });
     
     try {
-      // Usar la API correcta de InstalledApps
-      List<AppInfo> apps = await InstalledApps.getInstalledApps();
+      // Usar la API correcta de InstalledApps con manejo de errores
+      List<AppInfo> apps = await InstalledApps.getInstalledApps(true, true);
+      
+      if (apps.isEmpty) {
+        print('No se encontraron aplicaciones o no se tienen los permisos necesarios');
+        // Mostrar un mensaje al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudieron cargar las aplicaciones. Verifica los permisos de la aplicación.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
       
       // Filtrar aplicaciones del sistema si es necesario
       apps = apps.where((app) => 
@@ -58,6 +69,14 @@ class _AppSelectionPageState extends State<AppSelectionPage> {
       setState(() {
         _isLoading = false;
       });
+      
+      // Mostrar un mensaje de error más descriptivo
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar aplicaciones: $e'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
   }
   

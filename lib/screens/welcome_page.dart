@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'emitter_setup_page.dart';
-import 'receiver_setup_page.dart';
+import 'emitter_screen.dart';
+import 'receiver_screen.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
