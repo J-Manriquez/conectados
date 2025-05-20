@@ -3,8 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'bluetooth_service.dart';
 import 'notification_service.dart';
 import '../models/notification_item.dart';
@@ -14,19 +14,31 @@ class BackgroundService {
   factory BackgroundService() => _instance;
   BackgroundService._internal();
   
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = 
-      FlutterLocalNotificationsPlugin();
-  
   Future<void> initialize() async {
-    // Inicializar notificaciones locales
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
+    // Inicializar awesome_notifications
+    await AwesomeNotifications().initialize(
+      // Icono de la aplicación por defecto
+      'resource://drawable/app_icon',
+      [
+        NotificationChannel(
+          channelKey: 'conectados_channel',
+          channelName: 'Notificaciones de Conectados',
+          channelDescription: 'Canal para notificaciones de la aplicación Conectados',
+          defaultColor: Colors.blue,
+          ledColor: Colors.white,
+          importance: NotificationImportance.High,
+          playSound: true,
+          enableVibration: true
+        ),
+      ]
     );
     
-    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    // Solicitar permisos de notificación
+    await AwesomeNotifications().isNotificationAllowed().then((isAllowed) {
+      if (!isAllowed) {
+        AwesomeNotifications().requestPermissionToSendNotifications();
+      }
+    });
     
     // Inicializar servicio en segundo plano
     final service = FlutterBackgroundService();
@@ -63,6 +75,21 @@ class BackgroundService {
     WidgetsFlutterBinding.ensureInitialized();
     DartPluginRegistrant.ensureInitialized();
     
+    // Inicializar awesome_notifications en el servicio
+    await AwesomeNotifications().initialize(
+      'resource://drawable/app_icon',
+      [
+        NotificationChannel(
+          channelKey: 'conectados_channel',
+          channelName: 'Notificaciones de Conectados',
+          channelDescription: 'Canal para notificaciones de la aplicación Conectados',
+          defaultColor: Colors.blue,
+          ledColor: Colors.white,
+          importance: NotificationImportance.High
+        ),
+      ]
+    );
+    
     if (service is AndroidServiceInstance) {
       service.on('setAsForeground').listen((event) {
         service.setAsForegroundService();
@@ -82,11 +109,24 @@ class BackgroundService {
     await notificationService.initialize();
     
     final bluetoothService = BluetoothConnectionService();
+    await bluetoothService.initialize();
     
     // Escuchar notificaciones y enviarlas por Bluetooth
     notificationService.notificationStream.listen((notification) async {
       // Enviar notificación por Bluetooth si hay conexión
       await bluetoothService.sendNotification(notification);
+      
+      // Mostrar notificación local usando awesome_notifications
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+          channelKey: 'conectados_channel',
+          title: notification.title,
+          body: notification.content,
+          color: notification.color,
+          notificationLayout: NotificationLayout.Default,
+        ),
+      );
     });
     
     // Mantener el servicio vivo
@@ -104,5 +144,19 @@ class BackgroundService {
         'current_date': DateTime.now().toIso8601String(),
       });
     });
+  }
+  
+  // Método para mostrar una notificación
+  Future<void> showNotification(NotificationItem notification) async {
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        channelKey: 'conectados_channel',
+        title: notification.title,
+        body: notification.content,
+        color: notification.color,
+        notificationLayout: NotificationLayout.Default,
+      ),
+    );
   }
 }
