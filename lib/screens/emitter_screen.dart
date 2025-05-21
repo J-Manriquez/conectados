@@ -1,6 +1,8 @@
+import 'package:conectados/screens/captured_notifications_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:notification_listener_service/notification_listener_service.dart';
 import 'dart:math';
 import '../services/bluetooth_service.dart';
 import '../services/notification_service.dart';
@@ -30,12 +32,16 @@ class _EmitterScreenState extends State<EmitterScreen> {
   String _pairingCode = 'Generando...';
   bool _isConnected = false;
   String _connectionStatusText = 'Desconectado';
-  // Nuevo estado para el modo de conexión
-  String _connectionMode = 'bluetooth'; // 'bluetooth' o 'internet'
-  // Nuevo estado para el toggle del modo de conexión
-  bool _isInternetMode = false; // Añadida la variable _isInternetMode
-  // Nuevo estado para los permisos Bluetooth
+  String _connectionMode = 'bluetooth';
+  bool _isInternetMode = false;
   bool _bluetoothPermissionGranted = false;
+  // Añadir variable para el permiso de notificaciones
+  bool _notificationPermissionGranted = false;
+  Map<String, List<NotificationItem>> _capturedNotifications = {};
+
+  // Estado para controlar la expansión de las tarjetas
+  bool _isConnectionStatusCardExpanded = false;
+  bool _isAppSelectionCardExpanded = false;
 
 
   @override
@@ -60,6 +66,14 @@ class _EmitterScreenState extends State<EmitterScreen> {
     // Suscribirse a las notificaciones recibidas
     _notificationService.notificationStream.listen((notification) {
       _flowLogService.logFlow(script: 'emitter_screen.dart - notificationsStream', message: 'Notificación recibida de NotificationService: ${notification.title}.');
+      // Añadir la notificación a la lista local y agruparla
+      setState(() {
+        if (!_capturedNotifications.containsKey(notification.packageName)) {
+          _capturedNotifications[notification.packageName] = [];
+        }
+        _capturedNotifications[notification.packageName]!.add(notification);
+      });
+
       if (_connectionMode == 'bluetooth') {
         // Enviar por Bluetooth si el modo es Bluetooth
         _bluetoothService.sendNotification(notification);
@@ -73,19 +87,28 @@ class _EmitterScreenState extends State<EmitterScreen> {
   // Método para verificar permisos Bluetooth (adaptado de receiver_screen.dart)
   Future<void> _checkPermissions() async {
     try {
-      _flowLogService.logFlow(script: 'emitter_screen.dart - _checkPermissions', message: 'Verificando permisos Bluetooth.');
+      _flowLogService.logFlow(script: 'emitter_screen.dart - _checkPermissions', message: 'Verificando permisos Bluetooth y notificaciones.');
       final bluetoothStatus = await Permission.bluetooth.status;
       final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
       final bluetoothScanStatus = await Permission.bluetoothScan.status;
-      final bluetoothAdvertiseStatus = await Permission.bluetoothAdvertise.status; // Añadir permiso de publicidad
+      final bluetoothAdvertiseStatus = await Permission.bluetoothAdvertise.status;
+      
+      // Verificar permiso de acceso a notificaciones
+      final notificationListenerStatus = await NotificationListenerService.isPermissionGranted();
 
       setState(() {
         _bluetoothPermissionGranted =
             bluetoothStatus.isGranted &&
             bluetoothConnectStatus.isGranted &&
             bluetoothScanStatus.isGranted &&
-            bluetoothAdvertiseStatus.isGranted; // Incluir permiso de publicidad
-        _flowLogService.logFlow(script: 'emitter_screen.dart - _checkPermissions', message: 'Permisos Bluetooth verificados. Concedidos: $_bluetoothPermissionGranted');
+            bluetoothAdvertiseStatus.isGranted;
+            
+        final _notificationPermissionGranted = notificationListenerStatus;
+        
+        _flowLogService.logFlow(
+          script: 'emitter_screen.dart - _checkPermissions', 
+          message: 'Permisos verificados. Bluetooth: $_bluetoothPermissionGranted, Notificaciones: $_notificationPermissionGranted'
+        );
       });
     } catch (e, st) {
       _errorService.logError(
@@ -97,17 +120,34 @@ class _EmitterScreenState extends State<EmitterScreen> {
     }
   }
 
-  // Método para solicitar permisos Bluetooth (adaptado de receiver_screen.dart)
+  // Método para solicitar permisos
   Future<void> _requestPermissions() async {
     try {
-      _flowLogService.logFlow(script: 'emitter_screen.dart - _requestPermissions', message: 'Solicitando permisos Bluetooth.');
+      _flowLogService.logFlow(script: 'emitter_screen.dart - _requestPermissions', message: 'Solicitando permisos Bluetooth y notificaciones.');
       await Permission.bluetooth.request();
       await Permission.bluetoothConnect.request();
       await Permission.bluetoothScan.request();
-      await Permission.bluetoothAdvertise.request(); // Solicitar permiso de publicidad
+      await Permission.bluetoothAdvertise.request();
+      
+      // Solicitar permiso de acceso a notificaciones
+      final notificationPermissionGranted = await NotificationListenerService.requestPermission();
+      if (notificationPermissionGranted) {
+        _flowLogService.logFlow(script: 'emitter_screen.dart - _requestPermissions', message: 'Permiso de notificaciones concedido.');
+        // Inicializar el servicio de notificaciones después de obtener el permiso
+        await _notificationService.initialize();
+      } else {
+        _flowLogService.logFlow(script: 'emitter_screen.dart - _requestPermissions', message: 'Permiso de notificaciones denegado.');
+        // Mostrar un mensaje al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Se requiere acceso a las notificaciones para el funcionamiento correcto de la aplicación.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
 
       _checkPermissions();
-      _flowLogService.logFlow(script: 'emitter_screen.dart - _requestPermissions', message: 'Solicitud de permisos Bluetooth completada.');
+      _flowLogService.logFlow(script: 'emitter_screen.dart - _requestPermissions', message: 'Solicitud de permisos completada.');
     } catch (e, st) {
       _errorService.logError(
         script: 'emitter_screen.dart - _requestPermissions',
@@ -156,19 +196,24 @@ class _EmitterScreenState extends State<EmitterScreen> {
     return code;
   }
 
-  // Actualizar el texto de estado de conexión basado en el modo
-  void _updateConnectionStatusText() {
-    if (_connectionMode == 'bluetooth') {
-      _connectionStatusText = _isConnected ? 'Conectado por Bluetooth' : 'Desconectado';
-    } else {
-      // Para el modo Internet, el estado "conectado" es cuando el receptor se conecta
-      // Inicialmente, el emisor está "Esperando conexión por Internet"
-      _connectionStatusText = 'Esperando conexión por Internet...';
-      // TODO: Implementar lógica para detectar si un receptor se ha conectado por Internet
-      // Esto podría implicar escuchar cambios en el documento de Firestore.
-    }
-     setState(() {}); // Forzar reconstrucción para actualizar el texto
-     _flowLogService.logFlow(script: 'emitter_screen.dart - _updateConnectionStatusText', message: 'Texto de estado de conexión actualizado: $_connectionStatusText.');
+  // Método para actualizar el texto de estado de conexión
+  void _updateConnectionStatusText({String status = 'Desconectado', String mode = 'none'}) {
+    setState(() {
+      // Si el modo es internet y está conectado, mostrar "Conectado por Internet"
+      if (_connectionMode == 'internet' && _isConnected) {
+        _connectionStatusText = 'Conectado por Internet';
+      }
+      // Si el modo es bluetooth y está conectado, mostrar "Conectado por Bluetooth"
+      else if (_connectionMode == 'bluetooth' && _isConnected) {
+         _connectionStatusText = 'Conectado por Bluetooth';
+      }
+      // Si no está conectado, mostrar el estado por defecto o un mensaje de conexión
+      else {
+         // Aquí puedes añadir lógica más detallada si necesitas estados como "Conectando..."
+         // Por ahora, si no está conectado, simplemente mostramos "Desconectado"
+         _connectionStatusText = 'Desconectado';
+      }
+    });
   }
 
   @override
@@ -178,164 +223,235 @@ class _EmitterScreenState extends State<EmitterScreen> {
       appBar: AppBar(
         title: const Text('Emisor'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Código de Vinculación',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: Text(
-                        _pairingCode,
-                        style: Theme.of(context).textTheme.displaySmall,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Eliminar el botón "Generar Nuevo Código"
-                    // Center(
-                    //   child: ElevatedButton(
-                    //     onPressed: () {
-                    //       _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Botón "Generar Nuevo Código" presionado.');
-                    //       _generateUniqueCode(); // Usar _generateUniqueCode
-                    //     },
-                    //     child: const Text('Generar Nuevo Código'),
-                    //   ),
-                    // ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Card(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Card de Código de Vinculación
+              Card(
+                elevation: 2.0,
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Estado de Conexión',
+                        'Código de Vinculación',
                         style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      // Toggle para seleccionar el modo de conexión
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Modo de Conexión:'),
-                          Switch(
-                            value: _isInternetMode,
-                            onChanged: (value) async {
-                              setState(() {
-                                _isInternetMode = value;
-                                _connectionMode = value ? 'internet' : 'bluetooth';
-                              });
-                              await _storageService.saveConnectionMode(_connectionMode); // Guardar la preferencia
-                              _updateConnectionStatusText(); // Actualizar texto de estado
-                              _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Toggle de modo de conexión cambiado a: $_connectionMode.');
-
-                              // TODO: Implementar lógica para iniciar/detener servicios según el modo
-                              if (_connectionMode == 'internet') {
-                                // Iniciar servicio de conexión por Internet (crear/actualizar documento en Firestore)
-                                _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Cambiando a modo Internet. Iniciando emisor.');
-                                // Asegurarse de que _pairingCode ya esté cargado/generado
-                                _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Valor actual de _pairingCode: $_pairingCode'); // Añadir este log
-                                if (_pairingCode != 'Generando...') {
-                                  _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Llamando a startEmitter con código: $_pairingCode'); // Añadir este log
-                                  await _internetConnectionService.startEmitter(_pairingCode);
-                                  // Opcional: detener servicios Bluetooth si estaban activos
-                                  // _bluetoothService.stopAdvertising(); // Si tienes un método para detener publicidad
-                                  // _bluetoothService.stopScanning(); // Si tienes un método para detener escaneo
-                                } else {
-                                   _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Código de emparejamiento no disponible al intentar iniciar emisor Internet.');
-                                }
-                              } else {
-                                // Cambiando a modo Bluetooth
-                                _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Cambiando a modo Bluetooth.');
-                                // Opcional: detener servicio de Internet (actualizar estado en Firestore)
-                                if (_pairingCode != 'Generando...') {
-                                  await _internetConnectionService.stopEmitter(_pairingCode);
-                                }
-                                // Iniciar servicios Bluetooth (escaneo/publicidad) si es necesario
-                                // Esto dependerá de tu implementación actual de Bluetooth en el emisor
-                                // Por ejemplo: _bluetoothService.startAdvertising();
-                              }
-                            },
-                          ),
-                          Text(_connectionMode == 'bluetooth' ? 'Bluetooth' : 'Internet'),
-                        ],
                       ),
                       const SizedBox(height: 16),
                       Center(
                         child: Text(
-                          _connectionStatusText,
-                          textAlign: TextAlign.center,
+                          _pairingCode,
+                          style: Theme.of(context).textTheme.displaySmall,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Mostrar indicador de progreso solo en modo Bluetooth o cuando se espera conexión Internet
-                      if (_connectionMode == 'bluetooth' && !_isConnected)
-                         const Center(
-                           child: CircularProgressIndicator(),
-                         ),
-                      if (_connectionMode == 'internet')
-                         const Center(
-                           child: CircularProgressIndicator(), // O un indicador diferente para Internet
-                         ),
+                      // Eliminar el botón "Generar Nuevo Código" si ya no es necesario
                     ],
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                onPressed: () {
-                  try {
-                    _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Botón "Continuar a Selección de Apps" presionado.');
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AppSelectionPage(),
+              const SizedBox(height: 16),
+
+              // Card de Estado de Conexión
+              Card(
+                elevation: 2.0,
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ExpansionTile(
+                  title: const Text('Estado de Conexión'),
+                  initiallyExpanded: _isConnectionStatusCardExpanded,
+                  onExpansionChanged: (expanded) {
+                    setState(() {
+                      _isConnectionStatusCardExpanded = expanded;
+                    });
+                  },
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
+                          // Toggle para seleccionar el modo de conexión
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Modo de Conexión:'),
+                              Switch(
+                                value: _isInternetMode,
+                                onChanged: (value) async {
+                                  setState(() {
+                                    _isInternetMode = value;
+                                    _connectionMode = value ? 'internet' : 'bluetooth';
+                                    // Al cambiar de modo, asumimos que la conexión se pierde hasta que se establezca en el nuevo modo
+                                    _isConnected = false; // Resetear estado de conexión
+                                  });
+                                  await _storageService.saveConnectionMode(_connectionMode); // Guardar la preferencia
+                                  _updateConnectionStatusText(); // Actualizar texto de estado
+                                  _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Toggle de modo de conexión cambiado a: $_connectionMode.');
+
+                                  // TODO: Implementar lógica para iniciar/detener servicios según el modo
+                                  if (_connectionMode == 'internet') {
+                                    // Iniciar servicio de conexión por Internet (crear/actualizar documento en Firestore)
+                                    _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Cambiando a modo Internet. Iniciando emisor.');
+                                    // Asegurarse de que _pairingCode ya esté cargado/generado
+                                    _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Valor actual de _pairingCode: $_pairingCode'); // Añadir este log
+                                    if (_pairingCode != 'Generando...') {
+                                      _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Llamando a startEmitter con código: $_pairingCode'); // Añadir este log
+                                      await _internetConnectionService.startEmitter(_pairingCode);
+                                      // Después de iniciar el emisor, el estado de conexión debería actualizarse
+                                      // Puedes añadir una escucha al estado de conexión de InternetConnectionService si lo tiene
+                                      // Por ahora, asumimos que startEmitter es síncrono o que el estado se actualiza internamente
+                                      // Si startEmitter es exitoso, puedes considerar que está "conectado" para este propósito
+                                       setState(() {
+                                          _isConnected = true; // Asumir conectado si startEmitter no lanzó error
+                                          _updateConnectionStatusText();
+                                       });
+                                      // Opcional: detener servicios Bluetooth si estaban activos
+                                      // _bluetoothService.stopAdvertising(); // Si tienes un método para detener publicidad
+                                      // _bluetoothService.stopScanning(); // Si tienes un método para detener escaneo
+                                    } else {
+                                       _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Código de emparejamiento no disponible al intentar iniciar emisor Internet.');
+                                    }
+                                  } else {
+                                    // Cambiando a modo Bluetooth
+                                    _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Cambiando a modo Bluetooth.');
+                                    // Opcional: detener servicio de Internet (actualizar estado en Firestore)
+                                    if (_pairingCode != 'Generando...') {
+                                      await _internetConnectionService.stopEmitter(_pairingCode);
+                                    }
+                                    // Iniciar servicios Bluetooth (escaneo/publicidad) si es necesario
+                                    // Esto dependerá de tu implementación actual de Bluetooth en el emisor
+                                    // Por ejemplo: _bluetoothService.startAdvertising();
+                                    // El estado de conexión Bluetooth se actualizará a través de la suscripción a _bluetoothService.connectionStatus
+                                  }
+                                },
+                              ),
+                              Text(_connectionMode == 'bluetooth' ? 'Bluetooth' : 'Internet'),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Center(
+                            child: Row( // Usar Row para alinear el texto y el indicador
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Mostrar CircularProgressIndicator solo si no está conectado
+                                if (!_isConnected)
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                if (!_isConnected) const SizedBox(width: 8), // Espacio entre indicador y texto
+                                Text(
+                                  _connectionStatusText,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  } catch (e, st) {
-                    _errorService.logError(
-                      script: 'emitter_screen.dart - App Selection Button',
-                      error: e,
-                      stackTrace: st,
-                    );
-                     _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Error al navegar a Selección de Apps: ${e.toString()}');
-                  }
-                },
-                child: const Text('Continuar a Selección de Apps'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+
+              // Card de Selección de Aplicaciones
+              Card(
+                elevation: 2.0,
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ExpansionTile(
+                  title: const Text('Selección de Aplicaciones'),
+                   initiallyExpanded: _isAppSelectionCardExpanded,
+                   onExpansionChanged: (expanded) {
+                     setState(() {
+                       _isAppSelectionCardExpanded = expanded;
+                     });
+                   },
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Selecciona las aplicaciones cuyas notificaciones deseas enviar:',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Botón "Seleccionar Aplicaciones" presionado.');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AppSelectionPage(),
+                                ),
+                              );
+                            },
+                            child: const Text('Seleccionar Aplicaciones'),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Botón "Solicitar Permisos de Notificación" presionado.');
+                              _requestPermissions();
+                            },
+                            child: const Text('Solicitar Permisos de Notificación'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Nuevo Card para Herramientas de Emisor (incluye el botón de notificaciones capturadas)
+              Card(
+                elevation: 2.0,
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Herramientas de Emisor',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          // Navegar a la nueva pantalla de notificaciones capturadas
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CapturedNotificationsScreen(
+                                capturedNotifications: _capturedNotifications,
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text('Ver Notificaciones Capturadas'),
+                      ),
+                      // Puedes añadir más botones o herramientas aquí en el futuro
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _flowLogService.logFlow(script: 'emitter_screen.dart - dispose', message: 'Liberando recursos de la pantalla del emisor.');
-    // No cerramos los streams aquí porque los servicios son singletons y se usan en segundo plano
-    // _bluetoothService.dispose(); // Esto podría detener el servicio de fondo
-    super.dispose();
   }
 }

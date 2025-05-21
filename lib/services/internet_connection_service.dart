@@ -40,15 +40,26 @@ class InternetConnectionService {
 
   // Método para detener el modo emisor por Internet (opcional, podrías querer mantener el documento)
   Future<void> stopEmitter(String uniqueCode) async {
-     _flowLogService.logFlow(script: 'internet_connection_service.dart - stopEmitter', message: 'Deteniendo modo emisor por Internet para código: $uniqueCode.');
+    _flowLogService.logFlow(script: 'internet_connection_service.dart - stopEmitter', message: 'Intentando detener emisor por Internet con código: $uniqueCode.');
     try {
-      // Opcional: podrías actualizar el estado a 'offline' o similar
-      await _firestore.collection(_connectionsCollection).doc(uniqueCode).update({
-        'status': 'offline',
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
-       _flowLogService.logFlow(script: 'internet_connection_service.dart - stopEmitter', message: 'Estado del documento de conexión actualizado a offline.');
-      // Opcional: eliminar el documento si no quieres mantenerlo
+      final docRef = _firestore.collection(_connectionsCollection).doc(uniqueCode);
+
+      // Verificar si el documento existe antes de intentar actualizarlo
+      final docSnapshot = await docRef.get();
+
+      if (docSnapshot.exists) {
+        // Si el documento existe, actualizar su estado a 'disconnected'
+        await docRef.update({
+          'status': 'disconnected',
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+        _flowLogService.logFlow(script: 'internet_connection_service.dart - stopEmitter', message: 'Estado de conexión por Internet actualizado a "disconnected" para código: $uniqueCode.');
+      } else {
+        // Si el documento no existe, simplemente registrar que no se encontró
+        _flowLogService.logFlow(script: 'internet_connection_service.dart - stopEmitter', message: 'Documento de conexión por Internet no encontrado para código: $uniqueCode. No se requiere actualización.');
+      }
+
+      // Opcional: Si deseas eliminar el documento al detener el emisor, descomenta la siguiente línea
       // await _firestore.collection(_connectionsCollection).doc(uniqueCode).delete();
       // _flowLogService.logFlow(script: 'internet_connection_service.dart - stopEmitter', message: 'Documento de conexión por Internet eliminado.');
     } catch (e, st) {
