@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_item.dart';
 import 'error_service.dart';
 import 'flow_log_service.dart';
+import 'connection_document_service.dart'; // Importar el nuevo servicio
 
 class InternetConnectionService {
   static final InternetConnectionService _instance = InternetConnectionService._internal();
@@ -11,6 +12,7 @@ class InternetConnectionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ErrorService _errorService = ErrorService();
   final FlowLogService _flowLogService = FlowLogService();
+  final ConnectionDocumentService _connectionDocumentService = ConnectionDocumentService(); // Instancia del nuevo servicio
 
   // Nombre de la colección en Firestore para las conexiones por Internet
   static const String _connectionsCollection = 'internet_connections';
@@ -19,22 +21,23 @@ class InternetConnectionService {
   Future<void> startEmitter(String uniqueCode) async {
     _flowLogService.logFlow(script: 'internet_connection_service.dart - startEmitter', message: 'Iniciando modo emisor por Internet con código: $uniqueCode.');
     try {
-      // Crear o actualizar el documento de conexión para este código
-      // Usamos set con merge: true para no sobrescribir si ya existe
-      await _firestore.collection(_connectionsCollection).doc(uniqueCode).set({
-        'status': 'disconnected', // Estado inicial
-        'notifications': [], // Lista vacía para las notificaciones
-        'lastUpdated': FieldValue.serverTimestamp(), // Timestamp de la última actualización
-        // Puedes añadir otros campos si son necesarios, como un ID de usuario si lo tienes
-      }, SetOptions(merge: true));
-      _flowLogService.logFlow(script: 'internet_connection_service.dart - startEmitter', message: 'Documento de conexión por Internet creado/actualizado para código: $uniqueCode.');
+      // Usar el nuevo servicio para crear o actualizar el documento
+      await _connectionDocumentService.createOrUpdateConnectionDocument(
+        uniqueCode,
+        status: 'disconnected', // Estado inicial
+        notifications: [], // Lista vacía inicial
+      );
+      _flowLogService.logFlow(script: 'internet_connection_service.dart - startEmitter', message: 'Documento de conexión creado/actualizado con éxito para código: $uniqueCode.');
+      print('Documento de conexión creado/actualizado con éxito para código: $uniqueCode');
     } catch (e, st) {
       _errorService.logError(
         script: 'internet_connection_service.dart - startEmitter',
         error: e,
         stackTrace: st,
       );
-      _flowLogService.logFlow(script: 'internet_connection_service.dart - startEmitter', message: 'Error al iniciar emisor por Internet: ${e.toString()}');
+      _flowLogService.logFlow(script: 'internet_connection_service.dart - startEmitter', message: 'Error al iniciar modo emisor: ${e.toString()}');
+      print('Error al iniciar modo emisor: $e');
+      // Considerar re-lanzar o manejar el error
     }
   }
 
@@ -74,18 +77,11 @@ class InternetConnectionService {
 
 
   // Método para enviar una notificación a través de Firestore
-  Future<void> sendNotification(NotificationItem notification, String uniqueCode) async {
+  Future<void> sendNotification(String uniqueCode, NotificationItem notification) async {
     _flowLogService.logFlow(script: 'internet_connection_service.dart - sendNotification', message: 'Intentando enviar notificación por Internet: ${notification.title}.');
     try {
-      // Convertir la notificación a mapa
-      final notificationMap = notification.toMap();
-
-      // Añadir la notificación a la lista en el documento de Firestore
-      // Usamos FieldValue.arrayUnion para añadir el mapa a la lista 'notifications'
-      await _firestore.collection(_connectionsCollection).doc(uniqueCode).update({
-        'notifications': FieldValue.arrayUnion([notificationMap]),
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
+      // Usar el nuevo servicio para añadir la notificación al documento
+      await _connectionDocumentService.addNotificationToDocument(uniqueCode, notification);
       _flowLogService.logFlow(script: 'internet_connection_service.dart - sendNotification', message: 'Notificación enviada por Internet a Firestore para código: $uniqueCode.');
       print('Notificación enviada por Internet: ${notification.title}');
     } catch (e, st) {
@@ -105,79 +101,81 @@ class InternetConnectionService {
   // Método para conectar como receptor por Internet
   // Retorna un Stream de notificaciones o null si el código no es válido
   Stream<List<NotificationItem>>? connectReceiver(String uniqueCode) {
-     _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Intentando conectar como receptor por Internet con código: $uniqueCode.');
-    try {
-      final docRef = _firestore.collection(_connectionsCollection).doc(uniqueCode);
-
-      // Verificar si el documento existe y actualizar el estado a 'connected'
-      // Usamos then/catchError para manejar la operación asíncrona inicial
-      docRef.get().then((docSnapshot) async {
-        if (docSnapshot.exists) {
-           _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Documento de conexión encontrado. Actualizando estado a conectado.');
-          await docRef.update({'status': 'connected', 'lastConnected': FieldValue.serverTimestamp()});
-        } else {
-           _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Documento de conexión no encontrado para código: $uniqueCode.');
-          // Manejar caso de código inválido en la UI del receptor
-          print('Código de conexión por Internet inválido.');
-          // TODO: Notificar a la UI que el código es inválido
-        }
-      }).catchError((e, st) {
-         _errorService.logError(
-            script: 'internet_connection_service.dart - connectReceiver - get/update',
-            error: e,
-            stackTrace: st,
-          );
-          _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver - get/update', message: 'Error al verificar/actualizar documento de conexión: ${e.toString()}');
-          print('Error al verificar/actualizar documento de conexión: $e');
-          // TODO: Notificar a la UI sobre el error
-      });
-
-
-      // Retornar un stream que escucha los cambios en el campo 'notifications'
-      // El suscriptor deberá manejar los errores de este stream
-      return docRef.snapshots().map((docSnapshot) {
-        if (docSnapshot.exists) {
-          final data = docSnapshot.data();
-          if (data != null && data.containsKey('notifications')) {
-            final List<dynamic> notificationsData = data['notifications'] ?? [];
-             _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Notificaciones recibidas por stream: ${notificationsData.length}.');
-            // Convertir la lista de mapas a lista de NotificationItem
-            return notificationsData.map((item) => NotificationItem.fromMap(item as Map<String, dynamic>)).toList();
-          }
-        }
-         _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'No se encontraron notificaciones en el stream o documento no existe.');
-        return []; // Devolver lista vacía si no hay notificaciones o el documento no existe
-      });
-      // Eliminado .handleError aquí
-
-    } catch (e, st) {
-      _errorService.logError(
-        script: 'internet_connection_service.dart - connectReceiver',
-        error: e,
-        stackTrace: st,
-      );
-      _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Error general en connectReceiver: ${e.toString()}');
-      print('Error general en connectReceiver: $e');
-      return null; // Retornar null si hay un error inicial
+    _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Intentando conectar como receptor por Internet con código: $uniqueCode.');
+    if (uniqueCode.isEmpty) {
+      _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Código vacío proporcionado.');
+      print('Código vacío proporcionado.');
+      return null; // O lanzar un error, dependiendo de la lógica de UI
     }
+
+    // Verificar si el documento existe y actualizar el estado
+    final docRef = _firestore.collection(_connectionsCollection).doc(uniqueCode);
+
+    // Usar el nuevo servicio para obtener el stream del documento
+    final connectionDocumentStream = _connectionDocumentService.getConnectionDocumentStream(uniqueCode);
+
+    // Escuchar el stream del documento para actualizar el estado y obtener notificaciones
+    // Este listener es solo para actualizar el estado en Firestore, no para consumir notificaciones
+    docRef.get().then((docSnapshot) async {
+      if (docSnapshot.exists) {
+        _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver - get', message: 'Documento encontrado para código: $uniqueCode. Actualizando estado a "connected".');
+        // Usar el nuevo servicio para actualizar el estado
+        await _connectionDocumentService.updateConnectionStatus(uniqueCode, 'connected');
+        print('Documento encontrado y estado actualizado a "connected".');
+      } else {
+        _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver - get', message: 'Documento no encontrado para código: $uniqueCode.');
+        print('Documento no encontrado para código: $uniqueCode.');
+        // TODO: Notificar a la UI que el código es inválido
+      }
+    }).catchError((e, st) {
+        _errorService.logError(
+          script: 'internet_connection_service.dart - connectReceiver - get/update',
+          error: e,
+          stackTrace: st,
+        );
+        _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver - get/update', message: 'Error al verificar/actualizar documento de conexión: ${e.toString()}');
+        print('Error al verificar/actualizar documento de conexión: $e');
+        // TODO: Notificar a la UI sobre el error
+    });
+
+
+    // Retornar un stream que escucha los cambios en el campo 'notifications'
+    // El suscriptor deberá manejar los errores de este stream
+    // Modificamos para mapear el stream de ConnectionDocument a un stream de List<NotificationItem>
+    return connectionDocumentStream.map((connectionDoc) {
+      if (connectionDoc != null) {
+         _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Notificaciones recibidas por stream: ${connectionDoc.notifications.length}.');
+        // Retornar la lista de notificaciones del modelo
+        return connectionDoc.notifications;
+      } else {
+         _flowLogService.logFlow(script: 'internet_connection_service.dart - connectReceiver', message: 'Documento de conexión nulo en el stream.');
+        return []; // Retornar lista vacía si el documento es nulo
+      }
+    });
   }
 
   // Método para desconectar como receptor por Internet (opcional)
   Future<void> disconnectReceiver(String uniqueCode) async {
-     _flowLogService.logFlow(script: 'internet_connection_service.dart - disconnectReceiver', message: 'Desconectando receptor por Internet para código: $uniqueCode.');
-    try {
-       final docRef = _firestore.collection(_connectionsCollection).doc(uniqueCode);
-       // Opcional: podrías actualizar el estado a 'disconnected' o similar
-       await docRef.update({'status': 'disconnected', 'lastDisconnected': FieldValue.serverTimestamp()});
-        _flowLogService.logFlow(script: 'internet_connection_service.dart - disconnectReceiver', message: 'Estado del documento de conexión actualizado a disconnected.');
-    } catch (e, st) {
-      _errorService.logError(
-        script: 'internet_connection_service.dart - disconnectReceiver',
-        error: e,
-        stackTrace: st,
-      );
-      _flowLogService.logFlow(script: 'internet_connection_service.dart - disconnectReceiver', message: 'Error al desconectar receptor por Internet: ${e.toString()}');
-      print('Error al desconectar receptor por Internet: $e');
-    }
+     _flowLogService.logFlow(script: 'internet_connection_service.dart - disconnectReceiver', message: 'Desconectando receptor por Internet con código: $uniqueCode.');
+     try {
+       // Opción 1: Actualizar estado a 'disconnected'
+       await _connectionDocumentService.updateConnectionStatus(uniqueCode, 'disconnected');
+       _flowLogService.logFlow(script: 'internet_connection_service.dart - disconnectReceiver', message: 'Estado actualizado a "disconnected" para código: $uniqueCode.');
+       print('Estado actualizado a "disconnected" para código: $uniqueCode');
+   
+       // Opción 2: Eliminar el documento completamente (si ya no se necesita)
+       // await _connectionDocumentService.deleteConnectionDocument(uniqueCode);
+       // _flowLogService.logFlow(script: 'internet_connection_service.dart - disconnectReceiver', message: 'Documento eliminado para código: $uniqueCode.');
+       // print('Documento eliminado para código: $uniqueCode');
+   
+     } catch (e, st) {
+       _errorService.logError(
+         script: 'internet_connection_service.dart - disconnectReceiver',
+         error: e,
+         stackTrace: st,
+       );
+       _flowLogService.logFlow(script: 'internet_connection_service.dart - disconnectReceiver', message: 'Error al desconectar receptor para código $uniqueCode: ${e.toString()}');
+       print('Error al desconectar receptor: $e');
+     }
   }
 }

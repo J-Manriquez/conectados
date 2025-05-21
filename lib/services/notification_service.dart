@@ -8,6 +8,7 @@ import '../models/notification_item.dart';
 import '../models/app_info.dart';
 import 'flow_log_service.dart'; // Importar FlowLogService
 import 'error_service.dart'; // Importar ErrorService
+import 'package:cloud_firestore/cloud_firestore.dart'; // Importar Firestore
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -21,6 +22,7 @@ class NotificationService {
 
   final FlowLogService _flowLogService = FlowLogService(); // Instancia de FlowLogService
   final ErrorService _errorService = ErrorService(); // Instancia de ErrorService
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Instancia de Firestore
 
   Future<void> initialize() async {
     _flowLogService.logFlow(script: 'notification_service.dart - initialize', message: 'Iniciando servicio de notificaciones.');
@@ -93,13 +95,17 @@ class NotificationService {
   // Método para procesar las notificaciones recibidas
   // Método para manejar las notificaciones recibidas del servicio de escucha
   // Modificado para aceptar dynamic y manejar posible Map<String, dynamic>
-  void _onNotificationReceived(dynamic eventData) async {
+  Future<void> _onNotificationReceived(dynamic eventData) async {
     _flowLogService.logFlow(script: 'notification_service.dart - _onNotificationReceived', message: 'Notificación recibida del servicio de escucha.');
+    print('[_onNotificationReceived] Raw eventData type: ${eventData.runtimeType}'); // Log: Tipo de dato recibido
+    print('[_onNotificationReceived] Raw eventData: $eventData'); // Log: Contenido crudo del dato recibido
+
     try {
       // Intentar convertir el dato recibido a ServiceNotificationEvent
       ServiceNotificationEvent? event;
       if (eventData is ServiceNotificationEvent) {
         event = eventData;
+        print('[_onNotificationReceived] Converted to ServiceNotificationEvent directly.'); // Log: Conversión directa exitosa
       } else if (eventData is Map<String, dynamic>) {
         // Si es un mapa, intentar construir un ServiceNotificationEvent (esto puede variar según la estructura real del mapa)
         // Esta es una suposición basada en el mensaje de error. Puede requerir ajuste.
@@ -123,9 +129,10 @@ class NotificationService {
             // extras: eventData['extras'] as Map<String, dynamic>?,
             // overrideGroupKey: eventData['overrideGroupKey'] as String?,
           );
+          print('[_onNotificationReceived] Converted Map to ServiceNotificationEvent.'); // Log: Conversión de Map exitosa
           _flowLogService.logFlow(script: 'notification_service.dart - _onNotificationReceived', message: 'Convertido Map a ServiceNotificationEvent.');
         } catch (e, st) {
-           _errorService.logError(
+          _errorService.logError(
             script: 'notification_service.dart - _onNotificationReceived - Map conversion',
             error: e,
             stackTrace: st,
@@ -153,44 +160,52 @@ class NotificationService {
          return;
       }
 
+      print('[_onNotificationReceived] Event packageName: ${event.packageName}'); // Log: Paquete del evento
+      print('[_onNotificationReceived] Event title: ${event.title}'); // Log: Título del evento
+      print('[_onNotificationReceived] Event content: ${event.content}'); // Log: Contenido del evento
+      print('[_onNotificationReceived] Selected app packages: $_selectedAppPackages'); // Log: Lista de apps seleccionadas
+
 
       // Filtrar notificaciones por paquete si la lista de seleccionadas no está vacía
-      if (_selectedAppPackages.isNotEmpty) {
-        if (event.packageName != null && _selectedAppPackages.contains(event.packageName)) {
-          _flowLogService.logFlow(script: 'notification_service.dart - _onNotificationReceived', message: 'Notificación recibida de ${event.packageName} (está en la lista de seleccionadas).');
-          // Crear un NotificationItem a partir del evento
-          final notificationItem = NotificationItem(
-            id: event.id.toString(), // Convertir id a String
-            appName: event.title ?? 'App desconocida',
-            packageName: event.packageName!,
-            title: event.title ?? 'Sin título', // Usar título del evento o un valor por defecto
-            content: event.content ?? 'Sin contenido', // Usar texto del evento o un valor por defecto
-            timestamp: DateTime.now(), // Usar timestamp del evento o la hora actual
-            time: DateTime.now().toString().substring(11, 16),
-            color: _getColorForApp(event.packageName), // Obtener color basado en el paquete
-            iconData: _getIconForApp(event.packageName), // Obtener icono basado en el paquete
-          );
+      // Si la lista de seleccionadas está vacía, procesar todas las notificaciones
+      if (_selectedAppPackages.isEmpty || (event.packageName != null && _selectedAppPackages.contains(event.packageName))) {
+        _flowLogService.logFlow(script: 'notification_service.dart - _onNotificationReceived', message: 'Procesando notificación de ${event.packageName}.');
+        print('[_onNotificationReceived] Package ${event.packageName} is in selected list or list is empty.'); // Log: Paquete en lista o lista vacía
 
-          // Añadir la notificación al stream principal
-          _notificationController.sink.add(notificationItem);
-          _flowLogService.logFlow(script: 'notification_service.dart - _onNotificationReceived', message: 'Notificación añadida al stream principal.');
-          // Opcional: Mostrar una notificación local (si es necesario para depuración o feedback)
-          // await _showNotification(notificationItem);
+        // Crear un NotificationItem a partir del evento
+        final notificationItem = NotificationItem(
+          id: event.id.toString(), // Convertir id a String
+          appName: event.title ?? 'App desconocida', // Usar título del evento como nombre de app si no hay otro campo
+          packageName: event.packageName!,
+          title: event.title ?? 'Sin título', // Usar título del evento o un valor por defecto
+          content: event.content ?? 'Sin contenido', // Usar texto del evento o un valor por defecto
+          timestamp: DateTime.now(), // Usar timestamp del evento o la hora actual
+          time: DateTime.now().toString().substring(11, 16),
+          color: _getColorForApp(event.packageName), // Obtener color basado en el paquete
+          iconData: _getIconForApp(event.packageName), // Obtener icono basado en el paquete
+        );
 
-        } else {
-          _flowLogService.logFlow(
-            script: 'notification_service.dart - _onNotificationReceived',
-            message: 'Notificación recibida de ${event.packageName}: ${event.title}'
-          );
-          
-          // Emitir la notificación al stream
-          // _notificationController.add(notificationItem);
-        }
+        // Añadir la notificación al stream principal (para la UI u otros listeners)
+        _notificationController.sink.add(notificationItem);
+        _flowLogService.logFlow(script: 'notification_service.dart - _onNotificationReceived', message: 'Notificación añadida al stream principal.');
+        print('[_onNotificationReceived] NotificationItem added to stream.'); // Log: Notificación añadida al stream
+
+        // *** Guardar la notificación en Firebase ***
+        // Usamos el método toMap() del modelo NotificationItem
+        await _firestore.collection('notifications').add(notificationItem.toMap());
+        _flowLogService.logFlow(script: 'notification_service.dart - _onNotificationReceived', message: 'Notificación guardada en Firebase.');
+        print('[_onNotificationReceived] Notification saved to Firebase.'); // Log: Notificación guardada en Firebase
+
+
+        // Opcional: Mostrar una notificación local (si es necesario para depuración o feedback)
+        // await _showNotification(notificationItem);
+
       } else {
         _flowLogService.logFlow(
-          script: 'notification_service.dart - _onNotificationReceived', 
+          script: 'notification_service.dart - _onNotificationReceived',
           message: 'Notificación ignorada de ${event.packageName} (no está en la lista de seleccionadas)'
         );
+         print('[_onNotificationReceived] Package ${event.packageName} is NOT in selected list.'); // Log: Paquete no está en lista seleccionada
       }
     } catch (e, st) {
       _errorService.logError(
@@ -198,6 +213,7 @@ class NotificationService {
         error: e,
         stackTrace: st,
       );
+       print('[_onNotificationReceived] Caught error: $e'); // Log: Error capturado
     }
   }
 

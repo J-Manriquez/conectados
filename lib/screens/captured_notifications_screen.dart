@@ -1,38 +1,79 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Importar Firestore
 import '../models/notification_item.dart';
 
 class CapturedNotificationsScreen extends StatelessWidget {
-  final Map<String, List<NotificationItem>> capturedNotifications;
+  // Eliminamos el parámetro capturedNotifications del constructor
+  // final Map<String, List<NotificationItem>> capturedNotifications;
 
   const CapturedNotificationsScreen({
     super.key,
-    required this.capturedNotifications,
+    // required this.capturedNotifications, // Eliminamos este parámetro
   });
 
   @override
   Widget build(BuildContext context) {
-    // Ordenar las aplicaciones por nombre para una visualización consistente
-    final sortedAppPackages = capturedNotifications.keys.toList()..sort();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notificaciones Capturadas'),
       ),
-      body: sortedAppPackages.isEmpty
-          ? const Center(
+      // Usamos StreamBuilder para escuchar los cambios en Firestore
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('notifications').orderBy('timestamp', descending: true).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error al cargar notificaciones: ${snapshot.error}'));
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
               child: Text('No se han capturado notificaciones aún.'),
-            )
-          : ListView.builder(
+            );
+          }
+
+          // Procesar los documentos para agrupar por packageName
+          final notifications = snapshot.data!.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return NotificationItem(
+              id: doc.id, // Usar el ID del documento como ID de notificación
+              packageName: data['packageName'] ?? 'Desconocido',
+              title: data['title'] ?? 'Sin título',
+              content: data['content'] ?? 'Sin contenido',
+              timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+              time: (data['timestamp'] as Timestamp?)?.toDate().toString().substring(11, 16) ?? '',
+              // Puedes añadir color e icono si los guardas en Firestore o los generas aquí
+              color: Colors.blue, // Color por defecto o lógica para obtenerlo
+              iconData: Icons.notifications, // Icono por defecto o lógica para obtenerlo
+              appName: data['title'] ?? 'App Desconocida',
+            );
+          }).toList();
+
+          // Agrupar notificaciones por packageName
+          final Map<String, List<NotificationItem>> groupedNotifications = {};
+          for (var notification in notifications) {
+            if (!groupedNotifications.containsKey(notification.packageName)) {
+              groupedNotifications[notification.packageName] = [];
+            }
+            groupedNotifications[notification.packageName]!.add(notification);
+          }
+
+          // Ordenar las aplicaciones por nombre para una visualización consistente
+          final sortedAppPackages = groupedNotifications.keys.toList()..sort();
+
+          return ListView.builder(
               itemCount: sortedAppPackages.length,
               itemBuilder: (context, index) {
                 final packageName = sortedAppPackages[index];
-                final notifications = capturedNotifications[packageName]!;
+                final appNotifications = groupedNotifications[packageName]!;
 
                 // Obtener el nombre de la aplicación (si está disponible en NotificationItem)
                 // Si NotificationItem no tiene appName, podrías necesitar un servicio para obtenerlo
                 // Basándome en el modelo NotificationItem, parece que solo tiene packageName.
                 // Para mostrar un nombre legible, podrías necesitar un mapa packageName -> appName
-                // o modificar NotificationItem para incluir appName.
                 // Por ahora, usaremos el packageName como identificador.
                 // TODO: Implementar la obtención del nombre legible de la aplicación si es necesario.
                 final appName = packageName; // Usar packageName por ahora
@@ -50,22 +91,24 @@ class CapturedNotificationsScreen extends StatelessWidget {
                       foregroundColor: Colors.white,
                       radius: 12,
                       child: Text(
-                        notifications.length.toString(),
+                        appNotifications.length.toString(),
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
-                    children: notifications.map((notification) {
+                    children: appNotifications.map((notification) {
                       return ListTile(
                         title: Text(notification.title ?? 'Sin título'),
                         subtitle: Text(notification.content ?? 'Sin texto'),
                         // Puedes añadir más detalles aquí si NotificationItem los tiene
-                        // Por ejemplo: leading: Icon(Icons.notifications),
+                        trailing: Text(notification.time), // Mostrar la hora
                       );
                     }).toList(),
                   ),
                 );
               },
-            ),
+            );
+        },
+      ),
     );
   }
 }

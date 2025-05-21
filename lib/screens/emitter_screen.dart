@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:conectados/screens/captured_notifications_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -74,12 +75,20 @@ class _EmitterScreenState extends State<EmitterScreen> {
         _capturedNotifications[notification.packageName]!.add(notification);
       });
 
-      if (_connectionMode == 'bluetooth') {
-        // Enviar por Bluetooth si el modo es Bluetooth
-        _bluetoothService.sendNotification(notification);
+      // Guardar SIEMPRE en la colección global (esto debería estar en NotificationService, pero asegúrate que así sea)
+      // _notificationService.saveNotificationToGlobal(notification);
+
+      // Enviar SIEMPRE al documento de conexión de Internet (si tienes pairing code válido)
+      if (_pairingCode != null && _pairingCode != 'Generando...') {
+        _flowLogService.logFlow(script: 'emitter_screen.dart - notificationsStream', message: 'Enviando notificación a Internet con pairing code: $_pairingCode.');
+        _internetConnectionService.sendNotification(_pairingCode, notification);
       } else {
-        // Enviar por Internet si el modo es Internet
-        _internetConnectionService.sendNotification(notification, _pairingCode);
+        _flowLogService.logFlow(script: 'emitter_screen.dart - notificationsStream', message: 'No se pudo enviar la notificación a Internet. Pairing code no válido.');
+      }
+
+      // Enviar por Bluetooth SOLO si el modo es Bluetooth
+      if (_connectionMode == 'bluetooth') {
+        _bluetoothService.sendNotification(notification);
       }
     });
   }
@@ -298,25 +307,22 @@ class _EmitterScreenState extends State<EmitterScreen> {
                                   if (_connectionMode == 'internet') {
                                     // Iniciar servicio de conexión por Internet (crear/actualizar documento en Firestore)
                                     _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Cambiando a modo Internet. Iniciando emisor.');
-                                    // Asegurarse de que _pairingCode ya esté cargado/generado
-                                    _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Valor actual de _pairingCode: $_pairingCode'); // Añadir este log
                                     if (_pairingCode != 'Generando...') {
-                                      _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Llamando a startEmitter con código: $_pairingCode'); // Añadir este log
+                                      _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Llamando a startEmitter con código: $_pairingCode');
                                       await _internetConnectionService.startEmitter(_pairingCode);
-                                      // Después de iniciar el emisor, el estado de conexión debería actualizarse
-                                      // Puedes añadir una escucha al estado de conexión de InternetConnectionService si lo tiene
-                                      // Por ahora, asumimos que startEmitter es síncrono o que el estado se actualiza internamente
-                                      // Si startEmitter es exitoso, puedes considerar que está "conectado" para este propósito
-                                       setState(() {
-                                          _isConnected = true; // Asumir conectado si startEmitter no lanzó error
-                                          _updateConnectionStatusText();
-                                       });
-                                      // Opcional: detener servicios Bluetooth si estaban activos
-                                      // _bluetoothService.stopAdvertising(); // Si tienes un método para detener publicidad
-                                      // _bluetoothService.stopScanning(); // Si tienes un método para detener escaneo
-                                    } else {
-                                       _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Código de emparejamiento no disponible al intentar iniciar emisor Internet.');
+                                      // Actualizar el estado a 'connected' en Firestore
+                                      await FirebaseFirestore.instance
+                                        .collection('internet_connections')
+                                        .doc(_pairingCode)
+                                        .update({'status': 'connected', 'lastUpdated': FieldValue.serverTimestamp()});
+                                      setState(() {
+                                        _isConnected = true;
+                                        _updateConnectionStatusText();
+                                      });
                                     }
+                                  // Opcional: detener servicios Bluetooth si estaban activos
+                                  // _bluetoothService.stopAdvertising(); // Si tienes un método para detener publicidad
+                                  // _bluetoothService.stopScanning(); // Si tienes un método para detener escaneo
                                   } else {
                                     // Cambiando a modo Bluetooth
                                     _flowLogService.logFlow(script: 'emitter_screen.dart - build', message: 'Cambiando a modo Bluetooth.');
@@ -435,9 +441,7 @@ class _EmitterScreenState extends State<EmitterScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => CapturedNotificationsScreen(
-                                capturedNotifications: _capturedNotifications,
-                              ),
+                              builder: (context) => const CapturedNotificationsScreen(),
                             ),
                           );
                         },
