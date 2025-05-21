@@ -5,28 +5,28 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    
+
     <!-- Permisos para ubicación (necesarios para Bluetooth) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    
+
     <!-- Permisos para notificaciones -->
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
+
     <!-- Permiso para iniciar al arrancar -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    
+
     <!-- Permiso para acceder a la lista de aplicaciones instaladas -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    
+
     <!-- Si usas ubicación, añade este también -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <application
         android:label="conectados"
-        android:name="${applicationName}"
+        android:name=".MyApplication"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -56,7 +56,7 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        
+
         <!-- Servicio para escuchar notificaciones -->
         <service
             android:name="com.example.conectados.ConectadosNotificationListenerService"
@@ -83,11 +83,17 @@
             android:foregroundServiceType="dataSync"
             android:exported="false"
             tools:replace="android:exported">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
+            <!-- El intent-filter incorrecto ha sido eliminado -->
         </service>
+
+        <!-- Receptor para notificaciones personalizadas -->
+        <receiver
+            android:name=".NotificationBroadcastReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.conectados.NOTIFICATION_RECEIVED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
-
-

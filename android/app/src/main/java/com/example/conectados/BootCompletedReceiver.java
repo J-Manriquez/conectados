@@ -10,6 +10,7 @@ public class BootCompletedReceiver extends BroadcastReceiver {
     
     @Override
     public void onReceive(Context context, Intent intent) {
+        Log.d(TAG, "onReceive: Broadcast recibido con acción: " + intent.getAction());
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
             Log.d(TAG, "Dispositivo iniciado, iniciando aplicación");
             
@@ -18,9 +19,15 @@ public class BootCompletedReceiver extends BroadcastReceiver {
                     .getLaunchIntentForPackage(context.getPackageName());
             
             if (launchIntent != null) {
+                Log.d(TAG, "onReceive: Launch intent encontrado para el paquete: " + context.getPackageName());
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(launchIntent);
+                Log.d(TAG, "onReceive: Actividad principal iniciada.");
+            } else {
+                Log.e(TAG, "onReceive: No se encontró launch intent para el paquete: " + context.getPackageName());
             }
+        } else {
+             Log.d(TAG, "onReceive: Acción de broadcast no manejada: " + intent.getAction());
         }
     }
 }

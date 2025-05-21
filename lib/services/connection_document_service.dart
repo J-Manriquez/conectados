@@ -85,6 +85,7 @@ class ConnectionDocumentService {
   Future<void> addNotificationToDocument(String uniqueCode, NotificationItem notification) async {
      _flowLogService.logFlow(script: 'connection_document_service.dart - addNotificationToDocument', message: 'Añadiendo notificación para código: $uniqueCode.');
     try {
+      print('[ConnectionDocumentService] Añadiendo notificación al documento $uniqueCode: ${notification.toMap()}'); // NUEVO PRINT
       await _firestore.collection(_connectionsCollection).doc(uniqueCode).update({
         'notifications': FieldValue.arrayUnion([notification.toMap()]),
         'lastUpdated': FieldValue.serverTimestamp(),
